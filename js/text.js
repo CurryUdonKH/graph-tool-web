@@ -1,11 +1,12 @@
 // 図の中の文字(日本語 + $...$ の数式)を並べる。
-// 画面では <text>(フォントは同梱の Noto Sans JP)と MathJax の SVG で描き、
+// 画面では <text>(フォントは同梱の Noto Sans JP / Noto Serif JP)と MathJax の SVG で描き、
 // 書き出すときは同じ並べ方のまま、文字を輪郭の線(path)に変えて描く。
 // こうすると、Mac でも Windows でも、PDF にしても見た目が変わらない。
 
-// 使えるフォント(ほかのフォントを足すときはここに並べる。使うときに読み込む)
+// 使えるフォント。明朝体は大きい(約 6MB)ので、選んだときだけ読み込む
 export const FONTS = {
   gothic: { url: new URL("../fonts/NotoSansJP-Regular.otf", import.meta.url).href, family: "DiagramJP", label: "ゴシック体(Noto Sans JP)" },
+  mincho: { url: new URL("../fonts/NotoSerifJP-Regular.otf", import.meta.url).href, family: "DiagramJPSerif", label: "明朝体(Noto Serif JP)" },
 };
 export const FONT_FAMILY = FONTS.gothic.family;
 const MATHJAX_URL = new URL("../vendor/tex-svg-full.js", import.meta.url).href;
@@ -102,7 +103,7 @@ function mathSvg(tex) {
 const measureCtx = document.createElement("canvas").getContext("2d");
 function textWidth(t, size, key) {
   if (loadedFonts[key]) return loadedFonts[key].getAdvanceWidth(t, size);
-  measureCtx.font = `${size}px "Hiragino Sans", sans-serif`;   // フォントを読み込む前の仮の幅
+  measureCtx.font = `${size}px ${key === "mincho" ? '"Hiragino Mincho ProN", serif' : '"Hiragino Sans", sans-serif'}`;   // フォントを読み込む前の仮の幅
   return measureCtx.measureText(t).width;
 }
 
@@ -165,7 +166,7 @@ export function textMarkup(L, x, y, color = "#000", rot = 0) {
   let h = "";
   for (const r of L.runs) {
     if (r.kind === "math") h += `<g transform="translate(${f1(x + r.x - r.vx * r.k)} ${f1(y + r.y)}) scale(${r.k})">${r.body.replace(/currentColor/g, color)}</g>`;
-    else h += `<text x="${f1(x + r.x)}" y="${f1(y + r.y)}" font-size="${L.size}" font-family="${FONTS[L.fontKey].family}, 'Hiragino Sans', sans-serif" fill="${r.bad ? "#c62828" : color}" xml:space="preserve">${esc(r.t)}</text>`;
+    else h += `<text x="${f1(x + r.x)}" y="${f1(y + r.y)}" font-size="${L.size}" font-family="${FONTS[L.fontKey].family}, ${L.fontKey === "mincho" ? "'Hiragino Mincho ProN', serif" : "'Hiragino Sans', sans-serif"}" fill="${r.bad ? "#c62828" : color}" xml:space="preserve">${esc(r.t)}</text>`;
   }
   return rot ? `<g transform="rotate(${rot} ${f1(x)} ${f1(y)})">${h}</g>` : h;
 }

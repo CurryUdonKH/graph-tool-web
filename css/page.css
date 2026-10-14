@@ -43,3 +43,48 @@ pre code { background: none; padding: 0; }
 .toc a { color: var(--accent); text-decoration: none; }
 .tip { background: #eef5fd; border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 13.5px; margin: 10px 0; }
 @media (max-width: 600px) { article { padding: 20px 16px; } }
+
+/* サイトの上の帯(入口・使い方・プライバシーポリシー) */
+header.site { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 20px;
+              background: rgba(255,255,255,.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+header.site .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ink); text-decoration: none; font-size: 15px; }
+header.site nav { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+header.site nav a { color: var(--muted); text-decoration: none; font-size: 13.5px; padding: 6px 10px; border-radius: 8px; }
+header.site nav a:hover { background: #f1f1ee; color: var(--ink); }
+main.wide { max-width: 1040px; }
+
+/* 入口のページ */
+.hero { padding: 24px 0 8px; }
+.hero h1 { font-size: clamp(26px, 4vw, 38px); line-height: 1.35; margin: 0 0 14px; letter-spacing: .01em; }
+.hero .lead { font-size: 15.5px; max-width: 720px; color: #4a4945; margin-bottom: 22px; }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-big { display: inline-flex; align-items: center; height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid #d3d3ce; background: #fff;
+           color: var(--ink); text-decoration: none; font-weight: 600; font-size: 14.5px; }
+.btn-big:hover { border-color: var(--accent); color: var(--accent); }
+.btn-big.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-big.primary:hover { background: #1f66bd; color: #fff; }
+.sec-title { font-size: 19px; margin: 44px 0 14px; }
+.tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.tool-card { display: block; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px 18px; color: inherit; text-decoration: none; transition: box-shadow .15s, border-color .15s; }
+.tool-card:hover { border-color: var(--accent); box-shadow: 0 6px 20px rgba(42,120,214,.14); }
+.tool-card svg { display: block; width: 100%; height: auto; background: #fafaf8; border-radius: 10px; margin-bottom: 12px; }
+.tool-card h3 { margin: 0 0 6px; font-size: 16.5px; }
+.tool-card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; counter-reset: st; }
+.steps li { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; counter-increment: st; }
+.steps li b { display: flex; align-items: center; gap: 8px; font-size: 15.5px; margin-bottom: 4px; }
+.steps li b::before { content: counter(st); display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+                      background: var(--accent); color: #fff; font-size: 13px; }
+.steps li span { color: var(--muted); font-size: 13.5px; }
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px 14px; }
+.features div { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.features b { display: block; font-size: 14.5px; margin-bottom: 2px; }
+.features span { color: var(--muted); font-size: 13.5px; }
+.faq details { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 0 16px; margin-bottom: 8px; }
+.faq summary { cursor: pointer; padding: 12px 0; font-weight: 600; font-size: 14.5px; }
+.faq details p { margin: 0 0 14px; color: #4a4945; font-size: 14px; }
+.site-foot { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+.site-foot .links { margin-top: 0; }
+.site-foot p { margin: 8px 0 0; }
+.sec-title, article h2 { scroll-margin-top: 70px; }
+@media (max-width: 600px) { header.site nav { margin-left: 0; } .hero h1 br { display: none; } }

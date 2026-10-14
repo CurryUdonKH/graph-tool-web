@@ -1,4 +1,4 @@
-// Excel / CSV を読み込んでグラフを作るページ(今は散布図。レポート用の図を作るときも使う)に共通の部分:
+// Excel / CSV を読み込んでグラフを作るページ(散布図・レポート用の図)に共通の部分:
 // ファイルの読み込みと ⚙ の設定、データの表、軸の設定欄、自動保存・一覧・開く・削除・書き出し。
 // ページごとにちがうところ(系列の作り方・グラフ・設定欄の中身)は cfg で受け取る。
 
@@ -8,7 +8,7 @@ import { dataRange } from "./scatter/plot.js";
 import { primsMarkup } from "./prims.js";
 import { layout, loadFont, onTextReady } from "./text.js";
 import { exportPNG, exportSVG, exportPDF } from "./export.js";
-import { $, esc, stamp, hms, mdhm, toast, setStatus, dialog, bindMoreMenu } from "./ui.js";
+import { $, esc, hms, hm, mdhm, nextName, toast, setStatus, dialog, bindMoreMenu } from "./ui.js";
 
 export const clone = o => JSON.parse(JSON.stringify(o));
 export const stem = name => name.replace(/\.[^.]+$/, "");
@@ -45,7 +45,7 @@ export function axisOpt(o, vals, warns, name) {
 }
 
 // cfg = {
-//   kind: 保存の種類("graph" など)、noun: 画面での呼び名("グラフ" など)、prefix: 最初の名前の頭("scatter" など)、lastKey: 前回開いていたものを覚える名前
+//   kind: 保存の種類("graph" など)、noun: 画面での呼び名("グラフ" など)、prefix: 最初の名前の頭("plot" なら plot1、plot2 …)、lastKey: 前回開いていたものを覚える名前
 //   store: { list, get, put, del }、defaultState()、fixState(st)(古い保存に足りない設定を足す)
 //   computeSeries(page) → { series, warns }(series は xs, ys を持つ)
 //   draw(page, series, warns, info) → { prims, W, H, box?(書き出す範囲), html?(グラフの下に出すもの) }
@@ -105,7 +105,44 @@ export function createDataPage(cfg) {
   };
 
   // 読み込みの欄と、ファイルごとの ⚙(シート・飛ばす行数・取り外し)
-  page.dropHTML = () => `<div id="drop"><b>Excel / CSV をここにドラッグ</b><br>またはクリックしてファイルを選ぶ(複数可)</div>`;
+  page.dropHTML = () => `<div id="drop"><b>Excel / CSV をここにドラッグ</b><br>またはクリックしてファイルを選ぶ(複数可)</div>` + libraryHTML();
+
+  // ---------------------------------------------------------------- ほかのグラフ・図で読み込んだファイルを使う
+  // (手元版では、読み込んだファイルを散布図とレポート用の図の両方で使えた。その代わり)
+  page.library = [];
+  const fileKey = f => `${f.name}|${f.raw ? f.raw.byteLength : 0}|${f.sheet || ""}|${JSON.stringify(f.range || null)}`;
+  async function loadLibrary() {
+    const recs = [...(await store.listGraphs()).map(r => [r, "散布図"]), ...(await store.listReports()).map(r => [r, "レポート用の図"])];
+    const seen = new Set(), lib = [];
+    for (const [r, kind] of recs) for (const f of r.files || []) {
+      const k = fileKey(f);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      lib.push({ ...f, from: `${kind}「${r.name}」` });
+    }
+    page.library = lib;
+  }
+  function libraryHTML() {
+    const mine = new Set(page.S.files.map(fileKey));
+    const lib = page.library.filter(f => !mine.has(fileKey(f)));
+    if (!lib.length) return "";
+    return `<details class="gear lib"><summary>📂 ほかのグラフ・図で読み込んだファイルを使う(${lib.length})</summary><div>
+      <select id="lib_pick" style="width:100%">${lib.map((f, i) => `<option value="${i}">${esc(f.name)}(${esc(f.from)})</option>`).join("")}</select>
+      <button class="btn wide" id="lib_use" style="margin-top:6px">このファイルを使う</button>
+      <div class="sub" style="margin-top:4px">ファイルを選び直さなくても、前に読み込んだものをそのまま使えます(表で直した所もそのまま)。</div></div></details>`;
+  }
+  function useLibrary(i) {
+    const mine = new Set(page.S.files.map(fileKey));
+    const f = page.library.filter(x => !mine.has(fileKey(x)))[i];
+    if (!f) return;
+    let name = f.name, n = 2;
+    while (page.S.files.some(x => x.name === name)) name = `${stem(f.name)} (${n++})${f.name.match(/\.[^.]+$/)?.[0] || ""}`;
+    const item = { name, excel: f.excel, raw: f.raw, sheet: f.sheet, skip: f.skip, range: f.range || null, sheets: f.sheets || [], table: clone(f.table) };
+    page.S.files.push(item);
+    if (cfg.onFilesAdded) cfg.onFilesAdded(page, [name]);
+    toast(`📁 「${name}」を使います`);
+    page.changed(true);
+  }
   page.gearHTML = (f, fi) => {
     let h = `<details class="gear"><summary>⚙ シート・飛ばす行数・取り外し</summary><div>`;
     if (f.excel && (f.sheets || []).length > 1)
@@ -126,6 +163,7 @@ export function createDataPage(cfg) {
   function bindFiles(body) {
     const drop = $("drop");
     if (drop) drop.onclick = () => $("f_data").click();
+    if ($("lib_use")) $("lib_use").onclick = () => useLibrary(+$("lib_pick").value);
     body.querySelectorAll("[data-k=sheet], [data-k=skip]").forEach(n => n.addEventListener("change", async e => {
       const t = e.target, f = page.S.files[+t.dataset.f];
       try {
@@ -401,10 +439,10 @@ export function createDataPage(cfg) {
   let chain = Promise.resolve();
   function queue(fn) {
     const p = chain.then(fn);
-    chain = p.catch(e => { console.error(e); setStatus(`⚠ 保存できませんでした(${e.message || e})`, true); });
+    chain = p.catch(e => { console.error(e); setStatus(`⚠ 保存できませんでした`, true, String(e.message || e)); });
     return p;
   }
-  const currentName = page.currentName = () => $("d_name").value.trim() || page.S.defaultName || (page.S.defaultName = `${cfg.prefix}-${stamp()}`);
+  const currentName = page.currentName = () => $("d_name").value.trim() || page.S.defaultName || `${cfg.prefix}1`;
 
   async function refreshList() {
     const list = await cfg.store.list();
@@ -413,6 +451,10 @@ export function createDataPage(cfg) {
       list.map(r => `<option value="${esc(r.id)}">${esc(r.name)}(${mdhm(new Date(r.updated))})</option>`).join("");
     sel.value = page.S.id && list.some(r => r.id === page.S.id) ? page.S.id : "__new__";
     $("d_delete").disabled = !page.S.id;
+    loadLibrary().catch(e => console.error(e));
+    // 名前を決めていない新しいものには、plot1、plot2 … のうち空いている番号の名前をつける(手元版と同じ)
+    if (!page.S.id && !page.S.defaultName) page.S.defaultName = nextName(cfg.prefix, list.map(r => r.name));
+    $("d_name").placeholder = page.S.id ? "" : `${page.S.defaultName}(ファイルを読み込むと自動で保存)`;
   }
 
   let saveTimer = null;
@@ -438,7 +480,7 @@ export function createDataPage(cfg) {
     await cfg.store.put(rec);
     S.id = rec.id; S.seen = now; S.sig = sigOf(name);
     if (document.activeElement !== $("d_name") && $("d_name").value.trim() !== name) $("d_name").value = name;
-    setStatus(`✅ 自動保存しました(${hms(new Date())})`);
+    setStatus(`✓ 保存済み ${hm(new Date())}`, false, "自動で保存しました");
     store.notify({ type: "saved", kind: cfg.kind, id: rec.id });
     if (created) await store.setSetting(cfg.lastKey, rec.id);
     if (created || renamed) await refreshList();
@@ -451,7 +493,7 @@ export function createDataPage(cfg) {
     page.S = { id: rec ? rec.id : null, seen: rec ? rec.updated : null, sig: null, defaultName: null,
                files: rec ? rec.files.map(f => ({ ...f, table: clone(f.table) })) : [], st };
     $("d_name").value = rec ? rec.name : "";
-    setStatus(rec ? `${mdhm(new Date(rec.updated))} に保存した${cfg.noun}` : "");
+    setStatus(rec ? `✓ 保存済み` : "", false, rec ? `${mdhm(new Date(rec.updated))} に保存した${cfg.noun}` : "");
     page.renderPlot(); page.renderPanel(); renderDataTable();
     // 開いた直後の値で印をつける(自動で補った設定だけで保存し直さないように)
     if (rec) page.S.sig = sigOf(rec.name);
@@ -512,6 +554,7 @@ export function createDataPage(cfg) {
     $("d_name").addEventListener("input", () => { clearTimeout(nameTimer); nameTimer = setTimeout(scheduleSave, 300); });
     $("d_name").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) e.target.blur(); });
     $("d_delete").onclick = deleteCurrent;
+    $("f_new").onclick = () => newRec();
     $("x_png").onclick = () => doExport(exportPNG);
     $("x_svg").onclick = () => doExport(exportSVG);
     $("x_pdf").onclick = () => doExport(exportPDF);
@@ -522,6 +565,7 @@ export function createDataPage(cfg) {
 
     onTextReady(() => page.renderPlot());   // フォント・数式の準備ができたら描き直す
     loadFont();
+    try { await loadLibrary(); } catch (e) { console.error(e); }
     loadState(null);
     try {
       const list = await cfg.store.list();

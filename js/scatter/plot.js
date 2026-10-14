@@ -152,7 +152,7 @@ const dashFor = (name, lw) => { const d = DASHES[name]; return d ? d.map(v => Ma
 
 // ---------------------------------------------------------------- 全体
 // opt = { W, H, fontSize, font, report, series, fits, xlabel, ylabel, title, legend, grid, sci, axes: { x: { log, range, fmt, digits }, y: {...} } }
-//   report = true:レポート向け(四方を黒い枠で囲み、目盛りは内向きで上下左右に付ける。今は使っていない)。false:散布図(上と右の枠なし、目盛りは外向き)
+//   report = true:レポート向け(四方を黒い枠で囲み、目盛りは内向きで上下左右に付ける)。false:散布図(上と右の枠なし、目盛りは外向き)
 //   series: [{ xs, ys, label, color, marker(なしは null), inside(白抜きにしない点は true), line(なし/"solid"/"dashed"...), yerr, mfc(点の中の色), ms }]
 //   fits:   [{ slope, intercept, x0, x1, color, dash, lw }]
 export function buildScatter(opt) { return buildPlot(opt); }

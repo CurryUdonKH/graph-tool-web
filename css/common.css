@@ -32,6 +32,8 @@ select, input[type=number] { font: inherit; height: 28px; padding: 0 6px; border
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .grid3 .btn { padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .grid3 svg { width: 20px; height: 20px; }
+.grid2 .btn svg { width: 16px; height: 16px; flex: none; }   /* 横に等間隔・縦に等間隔のアイコン */
+.grid2 .btn:has(svg) { display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
 .empty { color: var(--muted); line-height: 1.7; font-size: 12px; }
 .empty b { color: var(--ink); font-weight: 600; }
 .kbd { display: inline-block; padding: 0 5px; border: 1px solid #d3d3ce; border-bottom-width: 2px; border-radius: 4px; font-size: 11px; background: #fafaf8; color: var(--ink); }
@@ -41,16 +43,27 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px;
 .btn.primary:hover { background: #1f66bd; color: #fff; }
 
 /* いちばん上の帯:図の一覧・名前・一時保存・書き出し */
-#bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; background: #fff; }
-#bar .home { color: var(--muted); text-decoration: none; font-size: 12px; padding: 4px 6px; border-radius: 6px; }
-#bar .home:hover { background: #ecece8; color: var(--ink); }
-#bar .title { font-weight: 600; font-size: 14px; margin-right: 6px; }
-#bar label.fld { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
-#d_pick { max-width: 240px; }
-#d_name { font: inherit; height: 28px; padding: 0 8px; border: 1px solid #d3d3ce; border-radius: 6px; width: 230px; }
+#bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line); flex-wrap: nowrap; background: #fff; }
+@media (max-width: 1100px) { #bar { flex-wrap: wrap; } #bar .brand span { display: none; } }
+#bar .brand { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); text-decoration: none; font-weight: 700; font-size: 13.5px; padding: 3px 6px 3px 2px; border-radius: 8px; }
+#bar .brand:hover { background: #f1f1ee; }
+#bar .brand img { display: block; }
+#bar .apps { display: inline-flex; background: #f1f1ee; border-radius: 9px; padding: 3px; gap: 2px; }
+#bar .apps a { padding: 4px 11px; border-radius: 7px; color: var(--muted); text-decoration: none; font-size: 12.5px; white-space: nowrap; }
+#bar .apps a:hover { color: var(--ink); background: #e8e8e4; }
+#bar .apps a.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+#bar .doc { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; }
+#d_pick { max-width: 190px; height: 30px; }
+#d_name { font: inherit; height: 30px; padding: 0 8px; border: 1px solid #d3d3ce; border-radius: 6px; width: 170px; min-width: 90px; }
 #d_name:focus, #d_pick:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
-#d_status { color: var(--muted); font-size: 12px; min-width: 150px; }
+#d_status { color: #2f8f5b; font-size: 12px; white-space: nowrap; }
 #d_status.warn { color: var(--danger); }
+.btn.icon { width: 30px; padding: 0; font-weight: 700; }
+.pop .item.danger { color: var(--danger); }
+.pop .item.danger:hover { background: #fdf3f3; }
+.pop .item:disabled { opacity: .4; cursor: default; background: none; }
+.pop .sepline { height: 1px; background: var(--line); margin: 6px 4px; }
+.pop .item b { font-weight: 600; }
 .grp { display: inline-flex; align-items: center; gap: 4px; }
 .grp .lbl { color: var(--muted); font-size: 12px; margin-right: 2px; }
 
@@ -81,3 +94,11 @@ dialog ul { padding-left: 1.2em; line-height: 1.8; margin: 8px 0; }
 #toast.show { opacity: .94; }
 #busy { position: fixed; inset: 0; background: rgba(255,255,255,.5); display: none; align-items: center; justify-content: center; z-index: 40; font-size: 14px; }
 #busy.show { display: flex; }
+
+/* 入力欄(設定欄・小さなメニューで使う) */
+.fld2 { display: block; margin-bottom: 10px; }
+.fld2 > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+.fld2 input[type=text], .fld2 select, .fld2 input[type=number] { width: 100%; }
+input[type=text] { font: inherit; height: 30px; padding: 0 8px; border: 1px solid #d3d3ce; border-radius: 6px; background: #fff; }
+input[type=text]:focus, select:focus, input[type=number]:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.checks label, label.ck { display: flex; align-items: center; gap: 6px; padding: 3px 0; cursor: pointer; }

@@ -3,41 +3,53 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>図の作成 ・ 実験データ グラフ作成ツール</title>
-<meta name="description" content="状態遷移図・ブロック図・論理回路などをマウスで描いて、PNG / SVG / PDF で保存できる無料のツール。">
+<title>状態遷移図・論理回路・ブロック図を無料で作成(ブラウザだけ)| 実験データ グラフ作成ツール</title>
+<meta name="description" content="実験レポートの状態遷移図・ブロック図・論理回路を、ブラウザだけで無料作成。論理ゲート(AND・OR・NOT・NAND・NOR・XOR・D フリップフロップ)、縦横に自動で引ける配線、LaTeX の数式。PDF / PNG / SVG で保存。登録不要。">
+<link rel="canonical" href="https://graph-tool-web.pages.dev/diagram">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/common.css">
 <link rel="stylesheet" href="css/diagram.css">
 <link rel="preload" href="fonts/NotoSansJP-Regular.otf" as="fetch" type="font/otf" crossorigin>
 </head>
 <body>
+<noscript><p style="padding:16px">状態遷移図・ブロック図・論理回路をマウスで描くツールです。使うには JavaScript を有効にしてください。 <a href="help.html">使い方</a></p></noscript>
 <header id="bar">
-  <a class="home" href="./" title="トップページへ">← トップ</a>
-  <span class="title">図の作成</span>
-  <label class="fld">開く図 <select id="d_pick" title="前に作った図を開きます"></select></label>
-  <label class="fld">名前 <input id="d_name" placeholder="図形を置くと自動で決まります" title="書き出すファイルの名前にもなります(空白は - になります)"></label>
-  <span id="d_status"></span>
+  <a class="brand" href="./" title="トップページへ"><img src="favicon.svg" alt="" width="22" height="22"><span>グラフ作成</span></a>
+  <nav class="apps" aria-label="道具を切り替える"><a href="diagram.html" class="on" aria-current="page">図の作成</a><a href="scatter.html">散布図</a><a href="report.html">レポート用の図</a></nav>
+  <div class="doc">
+    <select id="d_pick" title="前に作った図を開きます" aria-label="開く図"></select>
+    <input id="d_name" placeholder="図形を置くと自動で決まります" title="名前。書き出すファイルの名前にもなります(空白は - になります)" aria-label="名前">
+    <span id="d_status"></span>
+  </div>
   <div class="sp"></div>
-  <div class="grp">
-    <button class="btn" id="d_snap" title="今の状態を残しておきます。いろいろ試したあとで「戻す」からこの状態に戻れます。">📌 一時保存</button>
-    <div class="popwrap"><button class="btn" id="d_restore">↩ 戻す(0)</button><div class="pop" id="p_restore"></div></div>
-    <button class="btn danger" id="d_delete" title="この図を削除します">削除</button>
-  </div>
-  <div class="sep"></div>
-  <div class="grp" title="図形を描いた範囲だけを書き出します(グリッド・下絵・選択の印は入りません)">
-    <span class="lbl">書き出す</span>
-    <button class="btn" id="x_png" title="PNG 画像(300 dpi)">PNG</button>
-    <button class="btn" id="x_svg" title="SVG(拡大しても荒れない形式)">SVG</button>
-    <button class="btn primary" id="x_pdf" title="PDF(LaTeX に入れるならこれがおすすめ)">PDF</button>
-  </div>
-  <div class="popwrap"><button class="btn" id="d_more" title="数式の書き方・バックアップ">その他 ▾</button>
-    <div class="pop" id="p_more">
-      <button class="item" id="m_math">∑ 数式の書き方</button>
-      <button class="item" id="m_backup">⬇ バックアップを書き出す<br><small>保存した図を 1 つのファイルにまとめて保存</small></button>
-      <button class="item" id="m_restore">⬆ バックアップを読み込む<br><small>書き出したファイルから図を戻す</small></button>
-      <button class="item" id="m_about">ⓘ 保存について</button>
-      <a class="item" href="help.html" target="_blank" rel="noopener">📖 使い方(別のタブで開く)</a>
+  <button class="btn" id="d_snap" title="今の状態を残しておきます。いろいろ試したあとで「戻す」からこの状態に戻れます。">📌 一時保存</button>
+  <div class="popwrap"><button class="btn" id="d_restore" title="一時保存した状態に戻します">↩ 戻す(0)</button><div class="pop" id="p_restore"></div></div>
+  <div class="popwrap"><button class="btn" id="d_file">ファイル ▾</button>
+    <div class="pop" id="p_file">
+      <button class="item" id="f_new">＋ 新しい図</button>
+      <button class="item" id="f_dup">📄 この図を複製<br><small>まるごと「…-copy」という名前で保存して開く</small></button>
+      <button class="item" id="f_merge">🧩 別の図を取り込む(合成)<br><small>選んだ図の中身を、今の図の下か右に足す</small></button>
+      <div class="sepline"></div>
+      <button class="item" id="m_backup">⬇ バックアップを書き出す<br><small>保存した図・グラフを 1 つのファイルにまとめて保存</small></button>
+      <button class="item" id="m_restore">⬆ バックアップを読み込む<br><small>書き出したファイルから戻す</small></button>
       <input type="file" id="f_backup" accept="application/json,.json" hidden>
+      <div class="sepline"></div>
+      <button class="item danger" id="d_delete">🗑 この図を削除</button>
+    </div>
+  </div>
+  <div class="popwrap"><button class="btn primary" id="d_export" title="描いた範囲だけを書き出します(グリッド・下絵・選択の印は入りません)">⬇ 書き出す ▾</button>
+    <div class="pop" id="p_export">
+      <div class="cap">描いた範囲だけを書き出します(グリッド・下絵・選択の印は入りません)</div>
+      <button class="item" id="x_pdf"><b>PDF</b>(おすすめ)<br><small>LaTeX に入れるならこれ。拡大しても荒れない</small></button>
+      <button class="item" id="x_png"><b>PNG</b>(300 dpi)<br><small>Word や PowerPoint に貼るとき</small></button>
+      <button class="item" id="x_svg"><b>SVG</b><br><small>拡大しても荒れない。あとで手直しするとき</small></button>
+    </div>
+  </div>
+  <div class="popwrap"><button class="btn icon" id="d_more" title="使い方・数式の書き方・保存について" aria-label="ヘルプ">？</button>
+    <div class="pop" id="p_more">
+      <a class="item" href="help.html" target="_blank" rel="noopener">📖 使い方(別のタブで開く)</a>
+      <button class="item" id="m_math">∑ 数式の書き方(上付き・下付き・ギリシャ文字)</button>
+      <button class="item" id="m_about">ⓘ 保存について</button>
     </div>
   </div>
 </header>

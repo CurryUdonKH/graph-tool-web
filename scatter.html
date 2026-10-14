@@ -3,37 +3,49 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>散布図 ・ 実験データ グラフ作成ツール</title>
-<meta name="description" content="Excel / CSV から散布図と回帰直線(傾き・切片・R²・p 値)を作れる無料のツール。データはブラウザの外に出ません。">
+<title>散布図と回帰直線を無料で作成(Excel / CSV・R²・p 値)| 実験データ グラフ作成ツール</title>
+<meta name="description" content="Excel / CSV から散布図と回帰直線(最小二乗法)をブラウザだけで無料作成。傾き・切片の標準誤差、決定係数 R²、相関係数、p 値を表で出力。対数目盛り・指数表記・LaTeX の数式ラベル。理系大学生の実験レポートに。">
+<link rel="canonical" href="https://graph-tool-web.pages.dev/scatter">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/common.css">
 <link rel="stylesheet" href="css/datapage.css">
 <link rel="preload" href="fonts/NotoSansJP-Regular.otf" as="fetch" type="font/otf" crossorigin>
 </head>
 <body>
+<noscript><p style="padding:16px">Excel / CSV から散布図と回帰直線を作るツールです。使うには JavaScript を有効にしてください。 <a href="help.html">使い方</a></p></noscript>
 <header id="bar">
-  <a class="home" href="./" title="トップページへ">← トップ</a>
-  <span class="title">散布図</span>
-  <label class="fld">開くグラフ <select id="d_pick" title="前に作ったグラフを開きます"></select></label>
-  <label class="fld">名前 <input id="d_name" placeholder="ファイルを読み込むと自動で決まります" title="書き出すファイルの名前にもなります(空白は - になります)"></label>
-  <span id="d_status"></span>
-  <div class="sp"></div>
-  <button class="btn danger" id="d_delete" title="このグラフを削除します">削除</button>
-  <div class="sep"></div>
-  <div class="grp">
-    <span class="lbl">書き出す</span>
-    <button class="btn" id="x_png" title="PNG 画像(300 dpi)">PNG</button>
-    <button class="btn" id="x_svg" title="SVG(拡大しても荒れない形式)">SVG</button>
-    <button class="btn primary" id="x_pdf" title="PDF(LaTeX に入れるならこれがおすすめ)">PDF</button>
+  <a class="brand" href="./" title="トップページへ"><img src="favicon.svg" alt="" width="22" height="22"><span>グラフ作成</span></a>
+  <nav class="apps" aria-label="道具を切り替える"><a href="diagram.html">図の作成</a><a href="scatter.html" class="on" aria-current="page">散布図</a><a href="report.html">レポート用の図</a></nav>
+  <div class="doc">
+    <select id="d_pick" title="前に作ったグラフを開きます" aria-label="開くグラフ"></select>
+    <input id="d_name" placeholder="ファイルを読み込むと自動で決まります" title="名前。書き出すファイルの名前にもなります(空白は - になります)" aria-label="名前">
+    <span id="d_status"></span>
   </div>
-  <div class="popwrap"><button class="btn" id="d_more" title="数式の書き方・バックアップ">その他 ▾</button>
-    <div class="pop" id="p_more">
-      <button class="item" id="m_math">∑ 数式の書き方</button>
+  <div class="sp"></div>
+  <div class="popwrap"><button class="btn" id="d_file">ファイル ▾</button>
+    <div class="pop" id="p_file">
+      <button class="item" id="f_new">＋ 新しいグラフ</button>
+      <div class="sepline"></div>
       <button class="item" id="m_backup">⬇ バックアップを書き出す<br><small>保存した図・グラフを 1 つのファイルにまとめて保存</small></button>
       <button class="item" id="m_restore">⬆ バックアップを読み込む<br><small>書き出したファイルから戻す</small></button>
-      <button class="item" id="m_about">ⓘ 保存について</button>
-      <a class="item" href="help.html" target="_blank" rel="noopener">📖 使い方(別のタブで開く)</a>
       <input type="file" id="f_backup" accept="application/json,.json" hidden>
+      <div class="sepline"></div>
+      <button class="item danger" id="d_delete">🗑 このグラフを削除</button>
+    </div>
+  </div>
+  <div class="popwrap"><button class="btn primary" id="d_export" title="画面のグラフをそのまま書き出します">⬇ 書き出す ▾</button>
+    <div class="pop" id="p_export">
+      <div class="cap">画面のグラフをそのまま書き出します</div>
+      <button class="item" id="x_pdf"><b>PDF</b>(おすすめ)<br><small>LaTeX に入れるならこれ。拡大しても荒れない</small></button>
+      <button class="item" id="x_png"><b>PNG</b>(300 dpi)<br><small>Word や PowerPoint に貼るとき</small></button>
+      <button class="item" id="x_svg"><b>SVG</b><br><small>拡大しても荒れない。あとで手直しするとき</small></button>
+    </div>
+  </div>
+  <div class="popwrap"><button class="btn icon" id="d_more" title="使い方・数式の書き方・保存について" aria-label="ヘルプ">？</button>
+    <div class="pop" id="p_more">
+      <a class="item" href="help.html" target="_blank" rel="noopener">📖 使い方(別のタブで開く)</a>
+      <button class="item" id="m_math">∑ 数式の書き方(上付き・下付き・ギリシャ文字)</button>
+      <button class="item" id="m_about">ⓘ 保存について</button>
     </div>
   </div>
 </header>

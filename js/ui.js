@@ -6,7 +6,15 @@ export const $ = id => document.getElementById(id);
 export const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const pad = n => String(n).padStart(2, "0");
 export const stamp = (d = new Date()) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+export const hm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 export const hms = d => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+// prefix1, prefix2, … のうち、まだ使われていないいちばん小さい番号の名前(短く、LaTeX でも扱いやすい。手元版と同じ)
+export function nextName(prefix, used) {
+  const set = new Set(used);
+  let n = 1;
+  while (set.has(`${prefix}${n}`)) n++;
+  return `${prefix}${n}`;
+}
 export const mdhm = d => `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 let toastTimer = null;
@@ -15,7 +23,8 @@ export function toast(msg) {
   t.textContent = msg; t.classList.add("show");
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
 }
-export function setStatus(msg, warn) { const s = $("d_status"); s.textContent = msg; s.classList.toggle("warn", !!warn); }
+// 名前の横の小さな表示(「✓ 保存済み 12:34」など)。tip はマウスを乗せたときに出る説明
+export function setStatus(msg, warn, tip = "") { const s = $("d_status"); s.textContent = msg; s.title = tip; s.classList.toggle("warn", !!warn); }
 
 // 小窓を出して、押したボタンの値を返す
 export function dialog(title, bodyHTML, buttons = [{ label: "閉じる", value: null }]) {
@@ -49,6 +58,8 @@ export function bindPop(btnId, popId, onOpen) {
 export const closePops = () => document.querySelectorAll(".pop.open").forEach(p => p.classList.remove("open"));
 document.addEventListener("mousedown", ev => { if (!ev.target.closest(".popwrap")) closePops(); });
 document.addEventListener("keydown", ev => { if (ev.key === "Escape") closePops(); });
+// メニューの項目を押したら、メニューを閉じる
+document.addEventListener("click", ev => { if (ev.target.closest(".pop .item")) setTimeout(closePops, 0); });
 
 export function download(blob, filename) {
   const a = document.createElement("a");
@@ -60,10 +71,10 @@ export function download(blob, filename) {
 // ---------------------------------------------------------------- バックアップ(作図・散布図をまとめて)
 export async function backupOut() {
   const data = await store.exportBackup();
-  const n = data.diagrams.length + data.graphs.length;
+  const n = data.diagrams.length + data.graphs.length + data.reports.length;
   if (!n) { toast("まだ保存した図やグラフがありません"); return; }
   download(new Blob([JSON.stringify(data)], { type: "application/json" }), `graph-tool-backup-${stamp()}.json`);
-  toast(`⬇ 図 ${data.diagrams.length} 個・散布図 ${data.graphs.length} 個をバックアップしました`);
+  toast(`⬇ 図 ${data.diagrams.length} 個・散布図 ${data.graphs.length} 個・レポート用の図 ${data.reports.length} 個をバックアップしました`);
 }
 export async function backupIn(file) {
   try {
@@ -97,12 +108,14 @@ export const ABOUT = `
 <p>作った図やグラフは、<b>このブラウザの中</b>に自動で保存されます。インターネットの向こう(サーバー)には送られません。読み込んだ Excel / CSV も同じです。</p>
 <ul><li>別のパソコンや、別のブラウザ(Safari と Chrome など)では見えません</li>
 <li>ブラウザの「履歴とサイトデータの消去」をすると消えることがあります</li>
-<li>大事なものは、ときどき「その他 → バックアップを書き出す」でファイルに残してください(作図と散布図がまとめて入ります)。<br>
+<li>大事なものは、ときどき「ファイル → バックアップを書き出す」でファイルに残してください(作図・散布図・レポート用の図がまとめて入ります)。<br>
 別のパソコンでは「バックアップを読み込む」で戻せます</li></ul>`;
 
-// 上の帯の「その他」メニュー。onImported は読み込んだあとに一覧を新しくするため
+// 上の帯の「ファイル」「書き出す」「？」メニュー。onImported は読み込んだあとに一覧を新しくするため
 export function bindMoreMenu({ beforeBackup, onImported } = {}) {
   bindPop("d_more", "p_more");
+  if ($("d_file")) bindPop("d_file", "p_file");
+  if ($("d_export")) bindPop("d_export", "p_export");
   $("m_math").onclick = () => { closePops(); dialog("数式の書き方", MATH_HELP); };
   $("m_about").onclick = () => { closePops(); dialog("保存について", ABOUT); };
   $("m_backup").onclick = async () => { closePops(); if (beforeBackup) await beforeBackup(); backupOut(); };

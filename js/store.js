@@ -3,7 +3,7 @@
 //
 // 図(diagrams)の 1 件: { id, name, created, updated, doc, snapshots: [{ time, note, doc }] }
 // 散布図(graphs)の 1 件: { id, name, created, updated, files: [{ name, excel, raw: ArrayBuffer, sheet, skip, table }], state }
-// reports はレポート用の図の置き場所(今は使っていない。一度作った版で用意したので、版の番号を保つために残す)
+// レポート用の図(reports)の 1 件: 散布図と同じ形(state の中身だけちがう)
 
 const DB_NAME = "graph-tool-web";
 const DB_VERSION = 3;
@@ -55,6 +55,11 @@ export const listGraphs = async () =>
 export const getGraph = id => run("graphs", "readonly", s => s.get(id));
 export const putGraph = rec => run("graphs", "readwrite", s => s.put(rec));
 export const deleteGraph = id => run("graphs", "readwrite", s => s.delete(id));
+export const listReports = async () =>
+  ((await run("reports", "readonly", s => s.getAll())) || []).sort((a, b) => (b.updated || "").localeCompare(a.updated || ""));
+export const getReport = id => run("reports", "readonly", s => s.get(id));
+export const putReport = rec => run("reports", "readwrite", s => s.put(rec));
+export const deleteReport = id => run("reports", "readwrite", s => s.delete(id));
 export const getSetting = key => run("settings", "readonly", s => s.get(key));
 export const setSetting = (key, value) => run("settings", "readwrite", s => s.put(value, key));
 
@@ -80,7 +85,8 @@ export async function exportBackup() {
   const diagrams = await run("diagrams", "readonly", s => s.getAll());
   const pack = g => ({ ...g, files: g.files.map(f => ({ ...f, raw: f.raw ? toB64(f.raw) : null })) });
   const graphs = (await run("graphs", "readonly", s => s.getAll())).map(pack);
-  return { app: "graph-tool-web", version: 3, exported: nowISO(), diagrams, graphs };
+  const reports = (await run("reports", "readonly", s => s.getAll())).map(pack);
+  return { app: "graph-tool-web", version: 3, exported: nowISO(), diagrams, graphs, reports };
 }
 
 // 読み込んだバックアップを足す。同じ id で、こちらの方が新しいものは上書きしない
@@ -98,6 +104,7 @@ export async function importBackup(data) {
   await merge(data.diagrams, getDiagram, putDiagram, r => r.doc);
   const unpack = r => ({ ...r, files: r.files.map(f => ({ ...f, raw: f.raw ? fromB64(f.raw) : null })) });
   await merge(data.graphs, getGraph, putGraph, r => Array.isArray(r.files), unpack);
+  await merge(data.reports, getReport, putReport, r => Array.isArray(r.files), unpack);
   return { added, skipped };
 }
 

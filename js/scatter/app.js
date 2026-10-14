@@ -177,7 +177,7 @@ function bind(page, tab, body) {
 }
 
 const page = createDataPage({
-  kind: "graph", noun: "グラフ", prefix: "scatter", lastKey: "lastGraph",
+  kind: "graph", noun: "グラフ", prefix: "plot", lastKey: "lastGraph",
   store: { list: store.listGraphs, get: store.getGraph, put: store.putGraph, del: store.deleteGraph },
   defaultState, computeSeries, draw, panels, bind,
 });

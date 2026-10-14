@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>レポート用のグラフを無料で作成(誤差棒・白黒印刷・cm 指定)| 実験データ グラフ作成ツール</title>
+<meta name="description" content="実験レポート用のグラフをブラウザだけで無料作成。大きさを cm で決めて、線・点・誤差棒・近似直線。白黒印刷向け(点の形と線の種類で区別)、明朝体、LaTeX の数式。PDF / PNG / SVG で保存。">
+<link rel="canonical" href="https://graph-tool-web.pages.dev/report">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/datapage.css">
+<link rel="preload" href="fonts/NotoSansJP-Regular.otf" as="fetch" type="font/otf" crossorigin>
+</head>
+<body>
+<noscript><p style="padding:16px">大きさを cm で決めて、誤差棒つきのレポート用のグラフを作るツールです。使うには JavaScript を有効にしてください。 <a href="help.html">使い方</a></p></noscript>
+<header id="bar">
+  <a class="brand" href="./" title="トップページへ"><img src="favicon.svg" alt="" width="22" height="22"><span>グラフ作成</span></a>
+  <nav class="apps" aria-label="道具を切り替える"><a href="diagram.html">図の作成</a><a href="scatter.html">散布図</a><a href="report.html" class="on" aria-current="page">レポート用の図</a></nav>
+  <div class="doc">
+    <select id="d_pick" title="前に作った図を開きます" aria-label="開く図"></select>
+    <input id="d_name" placeholder="ファイルを読み込むと自動で決まります" title="名前。書き出すファイルの名前にもなります(空白は - になります)" aria-label="名前">
+    <span id="d_status"></span>
+  </div>
+  <div class="sp"></div>
+  <div class="popwrap"><button class="btn" id="d_file">ファイル ▾</button>
+    <div class="pop" id="p_file">
+      <button class="item" id="f_new">＋ 新しい図</button>
+      <div class="sepline"></div>
+      <button class="item" id="m_backup">⬇ バックアップを書き出す<br><small>保存した図・グラフを 1 つのファイルにまとめて保存</small></button>
+      <button class="item" id="m_restore">⬆ バックアップを読み込む<br><small>書き出したファイルから戻す</small></button>
+      <input type="file" id="f_backup" accept="application/json,.json" hidden>
+      <div class="sepline"></div>
+      <button class="item danger" id="d_delete">🗑 この図を削除</button>
+    </div>
+  </div>
+  <div class="popwrap"><button class="btn primary" id="d_export" title="決めた大きさ(cm)のまま書き出します">⬇ 書き出す ▾</button>
+    <div class="pop" id="p_export">
+      <div class="cap">決めた大きさ(cm)のまま書き出します</div>
+      <button class="item" id="x_pdf"><b>PDF</b>(おすすめ)<br><small>LaTeX に入れるならこれ。拡大しても荒れない</small></button>
+      <button class="item" id="x_png"><b>PNG</b>(300 dpi)<br><small>Word や PowerPoint に貼るとき</small></button>
+      <button class="item" id="x_svg"><b>SVG</b><br><small>拡大しても荒れない。あとで手直しするとき</small></button>
+    </div>
+  </div>
+  <div class="popwrap"><button class="btn icon" id="d_more" title="使い方・数式の書き方・保存について" aria-label="ヘルプ">？</button>
+    <div class="pop" id="p_more">
+      <a class="item" href="help.html" target="_blank" rel="noopener">📖 使い方(別のタブで開く)</a>
+      <button class="item" id="m_math">∑ 数式の書き方(上付き・下付き・ギリシャ文字)</button>
+      <button class="item" id="m_about">ⓘ 保存について</button>
+    </div>
+  </div>
+</header>
+<main id="sc">
+  <section id="left">
+    <div id="empty" class="empty-state" hidden>
+      <div class="big">📁</div>
+      <p><b>Excel / CSV を読み込んでください</b></p>
+      <p class="sub">右の「データ」の欄か、このページのどこかにファイルをドラッグしても読み込めます。<br>読み込むと図ができて、自動で保存されます。</p>
+      <button class="btn primary" id="empty_pick">ファイルを選ぶ</button>
+    </div>
+    <div id="plot_wrap"><svg id="plot" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div id="warns"></div>
+    <div id="below"></div>
+    <details id="data_box" hidden>
+      <summary>📋 データを見る・直す <span id="data_sum"></span></summary>
+      <div id="data_tabs"></div>
+      <div id="data_table"></div>
+    </details>
+  </section>
+  <aside id="panel">
+    <nav id="tabs">
+      <button data-tab="data" class="on">データ</button>
+      <button data-tab="look">見た目・ラベル</button>
+      <button data-tab="axis">軸・目盛り</button>
+    </nav>
+    <div id="tab_body"></div>
+  </aside>
+</main>
+<input type="file" id="f_data" accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv" multiple hidden>
+<div id="drop_cover">ここで離すとファイルを読み込みます</div>
+<dialog id="dlg"><h3 id="dlg_t"></h3><div id="dlg_b"></div><div class="acts" id="dlg_a"></div></dialog>
+<div id="toast"></div>
+<div id="busy">書き出しの準備をしています…</div>
+<script type="module" src="js/report/app.js"></script>
+</body>
+</html>
