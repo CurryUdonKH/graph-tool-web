@@ -22,8 +22,8 @@
 python3 -m http.server 8765
 ```
 
-## 公開(GitHub Pages)
-枝分かれ `main` の中身が、そのまま https://curryudonkh.github.io/graph-tool-web/ で公開されます(Settings → Pages で `main` の `/` を選んでいます)。変換の手順はありません。
+## 公開(Cloudflare Pages)
+枝分かれ `main` の中身が、そのまま https://graph-tool-web.pages.dev/ で公開されます。`main` に送ると、Cloudflare が自動で公開し直します。変換の手順はありません。
 
 ## フォルダ
 | 場所 | 中身 |
