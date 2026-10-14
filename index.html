@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>実験データ グラフ作成ツール</title>
+<meta name="description" content="実験レポートの図(状態遷移図・ブロック図・論理回路・散布図と回帰直線)を、ブラウザだけで作れる無料のツール。データはブラウザの外に出ません。">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/page.css">
+</head>
+<body>
+<main>
+  <h1>実験データ グラフ作成ツール</h1>
+  <p class="lead">実験レポートに使う図を、ブラウザだけで作れます。インストールも登録もいりません。</p>
+  <div class="cards">
+    <a class="card" href="diagram.html">
+      <h2>図の作成 <span class="tag">使えます</span></h2>
+      <p>状態遷移図・ブロック図・論理回路などをマウスで描いて、PNG / SVG / PDF で保存します。</p>
+    </a>
+    <a class="card" href="scatter.html">
+      <h2>散布図 <span class="tag">使えます</span></h2>
+      <p>Excel / CSV を読み込んで点を重ねて描き、回帰直線(傾き・切片・R²・p 値)を求めます。</p>
+    </a>
+    <div class="card soon">
+      <h2>レポート用の図 <span class="tag">準備中</span></h2>
+      <p>大きさを cm で決めて、白黒印刷向けの図を作ります。</p>
+    </div>
+  </div>
+  <div class="note">
+    <h3>データの保存について</h3>
+    <ul>
+      <li>作った図やグラフ、読み込んだデータは<b>このブラウザの中</b>に保存されます。インターネットの向こうには送られません。</li>
+      <li>別のパソコンや別のブラウザでは見えません。大事な図は「バックアップを書き出す」でファイルに残してください。</li>
+      <li>マウスで描くので、パソコンでの利用をおすすめします。</li>
+    </ul>
+  </div>
+  <div class="links"><a href="help.html">📖 使い方</a><a href="privacy.html">🔒 プライバシーポリシー</a></div>
+  <footer>日本語フォント:Noto Sans JP(SIL Open Font License)・ 数式:MathJax ・ PDF:jsPDF / svg2pdf.js ・ Excel:SheetJS</footer>
+</main>
+</body>
+</html>

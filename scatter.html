@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>散布図 ・ 実験データ グラフ作成ツール</title>
+<meta name="description" content="Excel / CSV から散布図と回帰直線(傾き・切片・R²・p 値)を作れる無料のツール。データはブラウザの外に出ません。">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/datapage.css">
+<link rel="preload" href="fonts/NotoSansJP-Regular.otf" as="fetch" type="font/otf" crossorigin>
+</head>
+<body>
+<header id="bar">
+  <a class="home" href="./" title="トップページへ">← トップ</a>
+  <span class="title">散布図</span>
+  <label class="fld">開くグラフ <select id="d_pick" title="前に作ったグラフを開きます"></select></label>
+  <label class="fld">名前 <input id="d_name" placeholder="ファイルを読み込むと自動で決まります" title="書き出すファイルの名前にもなります(空白は - になります)"></label>
+  <span id="d_status"></span>
+  <div class="sp"></div>
+  <button class="btn danger" id="d_delete" title="このグラフを削除します">削除</button>
+  <div class="sep"></div>
+  <div class="grp">
+    <span class="lbl">書き出す</span>
+    <button class="btn" id="x_png" title="PNG 画像(300 dpi)">PNG</button>
+    <button class="btn" id="x_svg" title="SVG(拡大しても荒れない形式)">SVG</button>
+    <button class="btn primary" id="x_pdf" title="PDF(LaTeX に入れるならこれがおすすめ)">PDF</button>
+  </div>
+  <div class="popwrap"><button class="btn" id="d_more" title="数式の書き方・バックアップ">その他 ▾</button>
+    <div class="pop" id="p_more">
+      <button class="item" id="m_math">∑ 数式の書き方</button>
+      <button class="item" id="m_backup">⬇ バックアップを書き出す<br><small>保存した図・グラフを 1 つのファイルにまとめて保存</small></button>
+      <button class="item" id="m_restore">⬆ バックアップを読み込む<br><small>書き出したファイルから戻す</small></button>
+      <button class="item" id="m_about">ⓘ 保存について</button>
+      <a class="item" href="help.html" target="_blank" rel="noopener">📖 使い方(別のタブで開く)</a>
+      <input type="file" id="f_backup" accept="application/json,.json" hidden>
+    </div>
+  </div>
+</header>
+<main id="sc">
+  <section id="left">
+    <div id="empty" class="empty-state" hidden>
+      <div class="big">📁</div>
+      <p><b>Excel / CSV を読み込んでください</b></p>
+      <p class="sub">右の「データ」の欄か、このページのどこかにファイルをドラッグしても読み込めます。<br>読み込むとグラフができて、自動で保存されます。</p>
+      <button class="btn primary" id="empty_pick">ファイルを選ぶ</button>
+    </div>
+    <div id="plot_wrap"><svg id="plot" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div id="warns"></div>
+    <div id="below"></div>
+    <details id="data_box" hidden>
+      <summary>📋 データを見る・直す <span id="data_sum"></span></summary>
+      <div id="data_tabs"></div>
+      <div id="data_table"></div>
+    </details>
+  </section>
+  <aside id="panel">
+    <nav id="tabs">
+      <button data-tab="data" class="on">データ</button>
+      <button data-tab="fit">回帰直線</button>
+      <button data-tab="label">ラベル・数式</button>
+      <button data-tab="axis">軸・目盛り</button>
+    </nav>
+    <div id="tab_body"></div>
+  </aside>
+</main>
+<input type="file" id="f_data" accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv" multiple hidden>
+<div id="drop_cover">ここで離すとファイルを読み込みます</div>
+<dialog id="dlg"><h3 id="dlg_t"></h3><div id="dlg_b"></div><div class="acts" id="dlg_a"></div></dialog>
+<div id="toast"></div>
+<div id="busy">書き出しの準備をしています…</div>
+<script type="module" src="js/scatter/app.js"></script>
+</body>
+</html>

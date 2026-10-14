@@ -1,0 +1,6 @@
+# 公開しないもの(手元にだけ置く)
+reference/
+HANDOFF.md
+CLAUDE.md
+.claude/
+.DS_Store

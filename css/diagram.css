@@ -1,0 +1,30 @@
+/* 作図のページ */
+#app { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* 上の帯 */
+#top { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: var(--bg); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.ib { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 30px; min-width: 30px; padding: 0 8px;
+      border: 1px solid transparent; background: transparent; border-radius: 7px; cursor: pointer; font: inherit; color: var(--ink); white-space: nowrap; }
+.ib:hover:not(:disabled) { background: #ecece8; }
+.ib:disabled { opacity: .35; cursor: default; }
+.ib svg { width: 18px; height: 18px; flex: none; }
+#zpct { min-width: 54px; font-variant-numeric: tabular-nums; }
+/* 本体:道具 | 画面 | 設定 */
+#main { display: flex; flex: 1; min-height: 0; position: relative; }
+#palette { width: 76px; flex: none; background: var(--bg); border-right: 1px solid var(--line); overflow-y: auto; padding: 6px 5px; }
+.ptitle { font-size: 10.5px; color: var(--muted); margin: 8px 2px 3px; letter-spacing: .02em; }
+.tool { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px 5px; margin-bottom: 2px;
+        border: 1px solid transparent; border-radius: 8px; background: transparent; cursor: pointer; font: inherit; font-size: 11px; color: var(--ink); }
+.tool:hover { background: #ecece8; }
+.tool.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.tool svg { width: 26px; height: 22px; }
+.gates { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.gates .tool { padding: 4px 0 3px; font-size: 9.5px; }
+.gates .tool svg { width: 30px; height: 20px; }
+#wrap { position: relative; overflow: auto; flex: 1; background: #fff; }
+svg#svg { display: block; user-select: none; }
+#side { width: 236px; flex: none; border-left: 1px solid var(--line); overflow-y: auto; padding: 10px 12px; background: #fff; }
+#edit { position: absolute; display: none; z-index: 5; font-family: DiagramJP, "Hiragino Sans", sans-serif; border: 1px dashed var(--accent);
+        border-radius: 0; padding: 0 2px; resize: none; background: transparent; text-align: center; line-height: 1.25;
+        outline: none; overflow: hidden; color: #000; }
+.slider { width: 100%; }
+#hint { padding: 6px 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); background: var(--bg); min-height: 30px; }
