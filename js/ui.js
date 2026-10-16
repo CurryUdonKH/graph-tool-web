@@ -115,7 +115,6 @@ export const ABOUT = `
 export function bindMoreMenu({ beforeBackup, onImported } = {}) {
   bindPop("d_more", "p_more");
   if ($("d_file")) bindPop("d_file", "p_file");
-  if ($("d_export")) bindPop("d_export", "p_export");
   $("m_math").onclick = () => { closePops(); dialog("数式の書き方", MATH_HELP); };
   $("m_about").onclick = () => { closePops(); dialog("保存について", ABOUT); };
   $("m_backup").onclick = async () => { closePops(); if (beforeBackup) await beforeBackup(); backupOut(); };

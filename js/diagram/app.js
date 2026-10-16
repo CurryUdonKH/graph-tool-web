@@ -238,7 +238,7 @@ async function deleteCurrent() {
 }
 
 // ---------------------------------------------------------------- 書き出し
-async function doExport(fmt) {
+async function doExport(fmt = null) {
   flushChanges();
   const prims = getPrims();
   if (!prims.length) { toast("まだ何も描かれていません"); return; }
@@ -270,9 +270,7 @@ async function start() {
   $("f_merge").onclick = () => openMerge();
   bindMoreMenu({ beforeBackup: async () => { flushChanges(); await chain; }, onImported: refreshList });
   $("d_delete").onclick = deleteCurrent;
-  $("x_png").onclick = () => doExport("png");
-  $("x_svg").onclick = () => doExport("svg");
-  $("x_pdf").onclick = () => doExport("pdf");
+  $("d_export").onclick = () => doExport();
 
   // 画面を閉じる・隠すときは、待っている変更をすぐ保存する
   addEventListener("pagehide", flushChanges);

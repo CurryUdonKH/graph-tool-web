@@ -528,7 +528,7 @@ export function createDataPage(cfg) {
     toast(`🗑 「${name}」を削除しました`);
   }
 
-  async function doExport(fmt) {
+  async function doExport(fmt = null) {
     if (!page.S.files.length) { toast("先に Excel / CSV を読み込んでください"); return; }
     if (!page.last.series.length) { toast("縦軸の列を選んでください"); return; }
     const busy = setTimeout(() => $("busy").classList.add("show"), 250);
@@ -558,9 +558,7 @@ export function createDataPage(cfg) {
     $("d_name").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) e.target.blur(); });
     $("d_delete").onclick = deleteCurrent;
     $("f_new").onclick = () => newRec();
-    $("x_png").onclick = () => doExport("png");
-    $("x_svg").onclick = () => doExport("svg");
-    $("x_pdf").onclick = () => doExport("pdf");
+    $("d_export").onclick = () => doExport();
     bindMoreMenu({ beforeBackup: flushSave, onImported: refreshList });
     addEventListener("pagehide", () => flushSave());
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSave(); });

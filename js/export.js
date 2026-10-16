@@ -38,7 +38,10 @@ export async function buildSVG(prims, box) {
   return { svg, w: b.w, h: b.h };
 }
 
-function download(blob, filename) {
+export const MIME = { pdf: "application/pdf", png: "image/png", svg: "image/svg+xml" };
+
+// ダウンロードフォルダに保存する
+export function download(blob, filename) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -46,35 +49,23 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 }
 
-export async function exportSVG(prims, name, box) {
-  const r = await buildSVG(prims, box);
-  if (!r) return false;
-  download(new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + r.svg], { type: "image/svg+xml" }), safeName(name) + ".svg");
-  return true;
-}
-
-// PNG は 300 dpi(1 pt = 300/72 ピクセル)、背景は白
-export async function exportPNG(prims, name, box, dpi = 300) {
-  const r = await buildSVG(prims, box);
-  if (!r) return false;
-  const k = dpi / 72, img = new Image();
-  const url = URL.createObjectURL(new Blob([r.svg], { type: "image/svg+xml" }));
-  try {
-    await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("画像にできませんでした")); img.src = url; });
-    const c = document.createElement("canvas");
-    c.width = Math.ceil(r.w * k); c.height = Math.ceil(r.h * k);
-    const g = c.getContext("2d");
-    g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
-    g.drawImage(img, 0, 0, c.width, c.height);
-    const blob = await new Promise(res => c.toBlob(res, "image/png"));
-    download(blob, safeName(name) + ".png");
-  } finally { URL.revokeObjectURL(url); }
-  return true;
-}
-
-export async function exportPDF(prims, name, box) {
-  const r = await buildSVG(prims, box);
-  if (!r) return false;
+// 書き出すファイルの中身を作る。r は buildSVG() の結果。PNG は 300 dpi(1 pt = 300/72 ピクセル)、背景は白
+export async function makeBlob(fmt, r, dpi = 300) {
+  if (fmt === "svg") return new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + r.svg], { type: MIME.svg });
+  if (fmt === "png") {
+    const k = dpi / 72, img = new Image();
+    const url = URL.createObjectURL(new Blob([r.svg], { type: MIME.svg }));
+    try {
+      await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("画像にできませんでした")); img.src = url; });
+      const c = document.createElement("canvas");
+      c.width = Math.ceil(r.w * k); c.height = Math.ceil(r.h * k);
+      const g = c.getContext("2d");
+      g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      return await new Promise(res => c.toBlob(res, MIME.png));
+    } finally { URL.revokeObjectURL(url); }
+  }
+  // PDF
   await loadScript("../vendor/jspdf.umd.min.js");
   await loadScript("../vendor/svg2pdf.umd.min.js");
   const { jsPDF } = window.jspdf;
@@ -85,6 +76,5 @@ export async function exportPDF(prims, name, box) {
   document.body.appendChild(holder);
   try { await pdf.svg(holder.firstElementChild, { x: 0, y: 0, width: r.w, height: r.h }); }
   finally { holder.remove(); }
-  pdf.save(safeName(name) + ".pdf");
-  return true;
+  return pdf.output("blob");
 }
