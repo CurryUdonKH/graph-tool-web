@@ -1334,6 +1334,24 @@ function dragMoveInner(d, p) {
         if (Math.abs(q.x - endO.x) < 1) e.points[i].x = q.x + dx;   // 縦の線 → 横位置を合わせる
       }
     }
+    // 配線は曲がり角で分かれている(見えない ● でつながっている)。選んだ図形につながった区間が横なら、
+    // その先の曲がり角も一緒に上下に(縦なら左右に)動かして、区間の向きを保つ。
+    // (こうしないと、動かすたびに区間が斜めになって新しい曲がり角ができ、折れ曲がる所が毎回変わってしまう)
+    const corner = id => {   // 自動でできた、線が 2 本だけの曲がり角(選んでいないもの)
+      const s = id != null ? get(id) : null;
+      return s && s.type === "dot" && s.auto && !sel.has(id) && edges().filter(x => x.from.id === id || x.to.id === id).length === 2 ? s : null;
+    };
+    for (const e of edges()) {
+      if (!isWire(e) || sel.has(e.id) || (e.points || []).length) continue;
+      for (const [mine, other] of [["from", "to"], ["to", "from"]]) {
+        if (!sel.has(e[mine].id)) continue;
+        const dot = corner(e[other].id), oe = O(e.id), od = dot && O(dot.id);
+        if (!dot || !oe || !od) continue;
+        const pa = refPtIn(orig, oe[mine]), pb = refPtIn(orig, oe[other]);
+        if (Math.abs(pa.y - pb.y) < 0.5 && Math.abs(pa.x - pb.x) >= 0.5) dot.y = od.y + dy;        // 横の区間 → 角を上下に
+        else if (Math.abs(pa.x - pb.x) < 0.5 && Math.abs(pa.y - pb.y) >= 0.5) dot.x = od.x + dx;   // 縦の区間 → 角を左右に
+      }
+    }
   } else if (d.kind === "handle") {
     const h = d.h, it = h.item;
     d.moved = true;
