@@ -1,4 +1,4 @@
-// Excel / CSV を読み込んでグラフを作るページ(散布図・レポート用の図)に共通の部分:
+// Excel / CSV を読み込んでグラフを作るページ(散布図)に共通の部分:
 // ファイルの読み込みと ⚙ の設定、データの表、軸の設定欄、自動保存・一覧・開く・削除・書き出し。
 // ページごとにちがうところ(系列の作り方・グラフ・設定欄の中身)は cfg で受け取る。
 
@@ -7,7 +7,7 @@ import { readRows, guessSkip, buildTable, colLetter, rangeLabel, sheetNames, isE
 import { dataRange } from "./scatter/plot.js";
 import { primsMarkup } from "./prims.js";
 import { layout, loadFont, onTextReady } from "./text.js";
-import { exportPNG, exportSVG, exportPDF } from "./export.js";
+import { exportWithPreview } from "./exportdialog.js";
 import { $, esc, hms, hm, mdhm, nextName, toast, setStatus, dialog, bindMoreMenu } from "./ui.js";
 
 export const clone = o => JSON.parse(JSON.stringify(o));
@@ -108,11 +108,11 @@ export function createDataPage(cfg) {
   page.dropHTML = () => `<div id="drop"><b>Excel / CSV をここにドラッグ</b><br>またはクリックしてファイルを選ぶ(複数可)</div>` + libraryHTML();
 
   // ---------------------------------------------------------------- ほかのグラフ・図で読み込んだファイルを使う
-  // (手元版では、読み込んだファイルを散布図とレポート用の図の両方で使えた。その代わり)
+  // (手元版では、読み込んだファイルをどの画面でも使えた。その代わり)
   page.library = [];
   const fileKey = f => `${f.name}|${f.raw ? f.raw.byteLength : 0}|${f.sheet || ""}|${JSON.stringify(f.range || null)}`;
   async function loadLibrary() {
-    const recs = [...(await store.listGraphs()).map(r => [r, "散布図"]), ...(await store.listReports()).map(r => [r, "レポート用の図"])];
+    const recs = (await store.listGraphs()).map(r => [r, "散布図"]);
     const seen = new Set(), lib = [];
     for (const [r, kind] of recs) for (const f of r.files || []) {
       const k = fileKey(f);
@@ -528,11 +528,14 @@ export function createDataPage(cfg) {
     toast(`🗑 「${name}」を削除しました`);
   }
 
-  async function doExport(fn) {
+  async function doExport(fmt) {
     if (!page.S.files.length) { toast("先に Excel / CSV を読み込んでください"); return; }
     if (!page.last.series.length) { toast("縦軸の列を選んでください"); return; }
     const busy = setTimeout(() => $("busy").classList.add("show"), 250);
-    try { await fn(page.last.prims, currentName(), page.last.box); }
+    try {
+      await exportWithPreview(fmt, page.last.prims, currentName(), page.last.box, "画面のグラフをそのまま書き出します。",
+        () => { clearTimeout(busy); $("busy").classList.remove("show"); });
+    }
     catch (e) { console.error(e); dialog("書き出せませんでした", `<p>${esc(e.message || e)}</p>`); }
     finally { clearTimeout(busy); $("busy").classList.remove("show"); }
   }
@@ -555,9 +558,9 @@ export function createDataPage(cfg) {
     $("d_name").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) e.target.blur(); });
     $("d_delete").onclick = deleteCurrent;
     $("f_new").onclick = () => newRec();
-    $("x_png").onclick = () => doExport(exportPNG);
-    $("x_svg").onclick = () => doExport(exportSVG);
-    $("x_pdf").onclick = () => doExport(exportPDF);
+    $("x_png").onclick = () => doExport("png");
+    $("x_svg").onclick = () => doExport("svg");
+    $("x_pdf").onclick = () => doExport("pdf");
     bindMoreMenu({ beforeBackup: flushSave, onImported: refreshList });
     addEventListener("pagehide", () => flushSave());
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSave(); });

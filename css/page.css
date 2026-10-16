@@ -88,3 +88,4 @@ main.wide { max-width: 1040px; }
 .site-foot p { margin: 8px 0 0; }
 .sec-title, article h2 { scroll-margin-top: 70px; }
 @media (max-width: 600px) { header.site nav { margin-left: 0; } .hero h1 br { display: none; } }
+.tag.beta { background: #fff1d6; color: #9a6400; }

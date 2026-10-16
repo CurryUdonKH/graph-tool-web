@@ -71,10 +71,10 @@ export function download(blob, filename) {
 // ---------------------------------------------------------------- バックアップ(作図・散布図をまとめて)
 export async function backupOut() {
   const data = await store.exportBackup();
-  const n = data.diagrams.length + data.graphs.length + data.reports.length;
+  const n = data.diagrams.length + data.graphs.length;
   if (!n) { toast("まだ保存した図やグラフがありません"); return; }
   download(new Blob([JSON.stringify(data)], { type: "application/json" }), `graph-tool-backup-${stamp()}.json`);
-  toast(`⬇ 図 ${data.diagrams.length} 個・散布図 ${data.graphs.length} 個・レポート用の図 ${data.reports.length} 個をバックアップしました`);
+  toast(`⬇ 図 ${data.diagrams.length} 個・散布図 ${data.graphs.length} 個をバックアップしました`);
 }
 export async function backupIn(file) {
   try {
@@ -108,7 +108,7 @@ export const ABOUT = `
 <p>作った図やグラフは、<b>このブラウザの中</b>に自動で保存されます。インターネットの向こう(サーバー)には送られません。読み込んだ Excel / CSV も同じです。</p>
 <ul><li>別のパソコンや、別のブラウザ(Safari と Chrome など)では見えません</li>
 <li>ブラウザの「履歴とサイトデータの消去」をすると消えることがあります</li>
-<li>大事なものは、ときどき「ファイル → バックアップを書き出す」でファイルに残してください(作図・散布図・レポート用の図がまとめて入ります)。<br>
+<li>大事なものは、ときどき「ファイル → バックアップを書き出す」でファイルに残してください(作図と散布図がまとめて入ります)。<br>
 別のパソコンでは「バックアップを読み込む」で戻せます</li></ul>`;
 
 // 上の帯の「ファイル」「書き出す」「？」メニュー。onImported は読み込んだあとに一覧を新しくするため

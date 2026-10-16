@@ -3,7 +3,7 @@
 
 import { initEditor, loadDoc, replaceDoc, getDoc, getPrims, flushChanges } from "./editor.js";
 import * as store from "../store.js";
-import { exportPNG, exportSVG, exportPDF } from "../export.js";
+import { exportWithPreview } from "../exportdialog.js";
 import { $, esc, pad, hms, hm, mdhm, nextName, toast, setStatus, dialog, bindPop, bindMoreMenu } from "../ui.js";
 
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -238,13 +238,14 @@ async function deleteCurrent() {
 }
 
 // ---------------------------------------------------------------- 書き出し
-async function doExport(fn) {
+async function doExport(fmt) {
   flushChanges();
   const prims = getPrims();
   if (!prims.length) { toast("まだ何も描かれていません"); return; }
   const busy = setTimeout(() => $("busy").classList.add("show"), 250);   // 初回はフォントなどの読み込みで少し待つ
   try {
-    await fn(prims, currentName());
+    await exportWithPreview(fmt, prims, currentName(), null, "描いた範囲だけを書き出します(グリッド・下絵・選択の印は入りません)。",
+      () => { clearTimeout(busy); $("busy").classList.remove("show"); });
   } catch (e) {
     console.error(e);
     dialog("書き出せませんでした", `<p>${esc(e.message || e)}</p>`);
@@ -269,9 +270,9 @@ async function start() {
   $("f_merge").onclick = () => openMerge();
   bindMoreMenu({ beforeBackup: async () => { flushChanges(); await chain; }, onImported: refreshList });
   $("d_delete").onclick = deleteCurrent;
-  $("x_png").onclick = () => doExport(exportPNG);
-  $("x_svg").onclick = () => doExport(exportSVG);
-  $("x_pdf").onclick = () => doExport(exportPDF);
+  $("x_png").onclick = () => doExport("png");
+  $("x_svg").onclick = () => doExport("svg");
+  $("x_pdf").onclick = () => doExport("pdf");
 
   // 画面を閉じる・隠すときは、待っている変更をすぐ保存する
   addEventListener("pagehide", flushChanges);

@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>実験レポートの図を無料で作成|状態遷移図・論理回路・散布図と回帰直線 - 実験データ グラフ作成ツール</title>
-<meta name="description" content="理系大学生の実験レポート向けの無料ツール。状態遷移図・ブロック図・論理回路(配線・D フリップフロップ)をマウスで描き、Excel / CSV から散布図・回帰直線(傾き・切片・R²・p 値)・誤差棒つきのレポート用の図を作れます。LaTeX 向けの PDF で保存。登録不要、データはブラウザの外に出ません。">
+<meta name="description" content="理系大学生の実験レポート向けの無料ツール。状態遷移図・ブロック図・論理回路(配線・D フリップフロップ)をマウスで描いて、LaTeX 向けの PDF や PNG で保存。Excel / CSV から散布図と回帰直線(傾き・切片・R²・p 値)も作れます(ベータ版)。登録不要、データはブラウザの外に出ません。">
 <link rel="canonical" href="https://graph-tool-web.pages.dev/">
 <meta name="google-site-verification" content="ftHzpPc5dfodqDNekGO2hoeBKGr7MFz1DV6Ze-g2FL8">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="実験データ グラフ作成ツール">
 <meta property="og:title" content="実験レポートの図を、ブラウザだけで無料作成">
-<meta property="og:description" content="状態遷移図・論理回路・散布図と回帰直線・誤差棒つきの図を、登録なしで作って PDF / PNG / SVG で保存。理系大学生の実験レポートに。">
+<meta property="og:description" content="状態遷移図・論理回路・ブロック図を、登録なしで作って PDF / PNG / SVG で保存。散布図と回帰直線も(ベータ版)。理系大学生の実験レポートに。">
 <meta property="og:url" content="https://graph-tool-web.pages.dev/">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary">
@@ -22,55 +22,49 @@
   "@type": "WebApplication",
   "name": "実験データ グラフ作成ツール",
   "url": "https://graph-tool-web.pages.dev/",
-  "description": "理系大学生の実験レポート向けに、状態遷移図・ブロック図・論理回路・散布図と回帰直線・誤差棒つきの図をブラウザだけで作れる無料のツール。",
+  "description": "理系大学生の実験レポート向けに、状態遷移図・ブロック図・論理回路、散布図と回帰直線(ベータ版)をブラウザだけで作れる無料のツール。",
   "applicationCategory": "EducationalApplication",
   "operatingSystem": "Web ブラウザ",
   "inLanguage": "ja",
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-  "featureList": ["状態遷移図・ブロック図の作成", "論理回路(論理ゲート・配線・D フリップフロップ)の作成", "Excel / CSV から散布図と回帰直線", "傾き・切片・標準誤差・R²・p 値", "誤差棒つきのレポート用の図", "LaTeX の数式", "PDF / PNG / SVG で保存"]
+  "featureList": ["状態遷移図・ブロック図の作成", "論理回路(論理ゲート・配線・D フリップフロップ)の作成", "Excel / CSV から散布図と回帰直線", "傾き・切片・標準誤差・R²・p 値", "LaTeX の数式", "PDF / PNG / SVG で保存"]
 }
 </script>
 </head>
 <body>
 <header class="site">
   <a class="brand" href="./"><img src="favicon.svg" alt="" width="24" height="24">実験データ グラフ作成ツール</a>
-  <nav><a href="diagram.html">図の作成</a><a href="scatter.html">散布図</a><a href="report.html">レポート用の図</a><a href="help.html">使い方</a></nav>
+  <nav><a href="diagram.html">図の作成</a><a href="scatter.html">散布図(ベータ版)</a><a href="help.html">使い方</a></nav>
 </header>
 <main class="wide">
   <section class="hero">
     <h1>実験レポートの図を、<br>ブラウザだけで無料作成</h1>
-    <p class="lead">状態遷移図・論理回路・散布図と回帰直線・誤差棒つきのグラフを、<b>登録なし・インストールなし</b>で作って、<b>LaTeX に入れやすい PDF</b> や Word 用の PNG で保存できます。理系大学生の実験レポートのために作りました。</p>
+    <p class="lead">状態遷移図・ブロック図・論理回路を、<b>登録なし・インストールなし</b>で作って、<b>LaTeX に入れやすい PDF</b> や Word 用の PNG で保存できます。Excel / CSV からの散布図と回帰直線も、ベータ版で使えます。理系大学生の実験レポートのために作りました。</p>
     <div class="cta">
       <a class="btn-big primary" href="diagram.html">図を描く</a>
-      <a class="btn-big" href="scatter.html">散布図を作る</a>
-      <a class="btn-big" href="report.html">レポート用の図を作る</a>
+      <a class="btn-big" href="scatter.html">散布図を作る(ベータ版)</a>
     </div>
   </section>
 
   <h2 class="sec-title">作れる図</h2>
   <div class="tools">
     <a class="tool-card" href="diagram.html">
-      <svg viewBox="0 0 220 110" aria-hidden="true"><g fill="none" stroke="#1f1f1d" stroke-width="2"><ellipse cx="45" cy="55" rx="32" ry="22" fill="#fff"/><ellipse cx="170" cy="55" rx="32" ry="22" fill="#fff"/><path d="M78 47 C 105 30 120 30 136 45" stroke="#2a78d6"/><path d="M130 40 l7 6 -9 2" stroke="#2a78d6"/><path d="M136 66 C 115 82 100 82 79 66" stroke="#2a78d6"/><path d="M85 72 l-7 -6 9 -2" stroke="#2a78d6"/></g><text x="45" y="60" font-size="14" text-anchor="middle" font-family="serif" font-style="italic">S₀</text><text x="170" y="60" font-size="14" text-anchor="middle" font-family="serif" font-style="italic">S₁</text></svg>
+      <svg viewBox="0 0 220 110" aria-hidden="true"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 9 5 1 9" fill="none" stroke="#2a78d6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><g fill="#fff" stroke="#1f1f1d" stroke-width="2"><ellipse cx="45" cy="55" rx="32" ry="22"/><ellipse cx="175" cy="55" rx="32" ry="22"/></g><g fill="none" stroke="#2a78d6" stroke-width="2" marker-end="url(#ah)"><path d="M70 41 C 92 20 128 20 148 40"/><path d="M150 69 C 128 90 92 90 72 70"/></g><text x="45" y="60" font-size="14" text-anchor="middle" font-family="serif" font-style="italic">S₀</text><text x="175" y="60" font-size="14" text-anchor="middle" font-family="serif" font-style="italic">S₁</text></svg>
       <h3>図の作成</h3>
       <p>状態遷移図・ブロック図・論理回路をマウスで描く。論理ゲート(AND・OR・NOT・NAND・NOR・XOR・D フリップフロップ)と、縦横に自動で引ける配線。</p>
     </a>
     <a class="tool-card" href="scatter.html">
       <svg viewBox="0 0 220 110" aria-hidden="true"><path d="M30 10 V95 H210" fill="none" stroke="#888" stroke-width="1.5"/><path d="M38 88 L200 22" stroke="#2a78d6" stroke-width="2"/><path d="M38 80 L200 50" stroke="#eb6834" stroke-width="2"/><g fill="#2a78d6"><circle cx="45" cy="84" r="4"/><circle cx="80" cy="72" r="4"/><circle cx="115" cy="56" r="4"/><circle cx="150" cy="44" r="4"/><circle cx="190" cy="26" r="4"/></g><g fill="#eb6834"><rect x="52" y="74" width="7" height="7"/><rect x="92" y="66" width="7" height="7"/><rect x="132" y="60" width="7" height="7"/><rect x="172" y="51" width="7" height="7"/></g></svg>
-      <h3>散布図と回帰直線</h3>
+      <h3>散布図と回帰直線 <span class="tag beta">ベータ版</span></h3>
       <p>Excel / CSV を読み込んで点を重ねて描き、最小二乗法の回帰直線。傾き・切片(± 標準誤差)・R²・相関係数・p 値を表で出してコピー。</p>
-    </a>
-    <a class="tool-card" href="report.html">
-      <svg viewBox="0 0 220 110" aria-hidden="true"><rect x="30" y="10" width="180" height="85" fill="none" stroke="#1f1f1d" stroke-width="1.5"/><path d="M45 82 L80 66 L115 52 L150 40 L190 22" fill="none" stroke="#1f1f1d" stroke-width="1.6"/><path d="M45 74 L80 70 L115 61 L150 57 L190 46" fill="none" stroke="#1f1f1d" stroke-width="1.6" stroke-dasharray="5 3"/><g stroke="#1f1f1d" stroke-width="1"><path d="M80 58 V74 M76 58 H84 M76 74 H84"/><path d="M150 32 V48 M146 32 H154 M146 48 H154"/></g><g fill="#1f1f1d"><circle cx="45" cy="82" r="3.5"/><circle cx="80" cy="66" r="3.5"/><circle cx="115" cy="52" r="3.5"/><circle cx="150" cy="40" r="3.5"/><circle cx="190" cy="22" r="3.5"/></g><g fill="#fff" stroke="#1f1f1d" stroke-width="1.2"><rect x="41" y="70" width="8" height="8"/><rect x="76" y="66" width="8" height="8"/><rect x="111" y="57" width="8" height="8"/><rect x="146" y="53" width="8" height="8"/><rect x="186" y="42" width="8" height="8"/></g></svg>
-      <h3>レポート用の図</h3>
-      <p>大きさを cm で決めて、線・点・誤差棒・近似直線のグラフ。白黒印刷でも見分けられる形と線の種類、明朝体にも対応。</p>
     </a>
   </div>
 
   <h2 class="sec-title">3 ステップで完成</h2>
   <ol class="steps">
     <li><b>開く</b><span>上のボタンから、作りたい図の画面を開きます。登録はいりません。</span></li>
-    <li><b>作る</b><span>図形を置く、または Excel / CSV をドラッグ。ラベルは <code>$10^{-3}$</code> や <code>$\alpha$</code> のように LaTeX の書き方で数式にできます。</span></li>
+    <li><b>作る</b><span>図形や論理ゲートを置いて、線や配線でつなぎます。文字は <code>$10^{-3}$</code> や <code>$\alpha$</code> のように LaTeX の書き方で数式にできます。</span></li>
     <li><b>保存する</b><span>「書き出す」から PDF / PNG / SVG で保存。LaTeX には PDF、Word には PNG がおすすめです。</span></li>
   </ol>
 
@@ -80,7 +74,7 @@
     <div><b>🔒 データが外に出ない</b><span>図や読み込んだデータは、あなたのブラウザの中だけに保存されます。</span></div>
     <div><b>∑ LaTeX の数式</b><span>上付き・下付き・ギリシャ文字・分数を、LaTeX と同じ書き方で。</span></div>
     <div><b>📄 LaTeX・Word に貼れる</b><span>PDF・SVG は拡大しても荒れません。PNG は 300 dpi。</span></div>
-    <div><b>📊 Excel / CSV そのまま</b><span>Shift_JIS・全角数字・「1,200」も自動で数値に。表の上のメモ行も自動で飛ばします。</span></div>
+    <div><b>🔌 論理回路も楽に</b><span>端子をクリックするだけで、配線を縦横に自動で引けます。途中から分岐も。</span></div>
     <div><b>💾 自動保存</b><span>作ったものは自動で保存。次に開くと続きから。バックアップも書き出せます。</span></div>
   </div>
 
@@ -88,16 +82,15 @@
   <div class="faq">
     <details><summary>本当に無料ですか? 登録はいりますか?</summary><p>無料で、登録もいりません。ブラウザでページを開くだけで使えます。</p></details>
     <details><summary>作った図を LaTeX のレポートに入れられますか?</summary><p>はい。「書き出す → PDF」で保存して、<code>\includegraphics{fig1.pdf}</code> のように読み込めます。文字は線に変えて書き出すので、どのパソコンでも同じ見た目になります。</p></details>
-    <details><summary>Excel のデータから散布図と回帰直線を作れますか?</summary><p>はい。Excel(.xlsx / .xls)や CSV を読み込んで、横軸と縦軸の列を選ぶだけで、散布図と回帰直線を描きます。傾き・切片とその標準誤差、決定係数 R²、相関係数 r、p 値も表で出ます。計算に使う x の範囲も決められます。</p></details>
+    <details><summary>Excel のデータから散布図と回帰直線を作れますか?</summary><p>はい(ベータ版です)。Excel(.xlsx / .xls)や CSV を読み込んで、横軸と縦軸の列を選ぶだけで、散布図と回帰直線を描きます。傾き・切片とその標準誤差、決定係数 R²、相関係数 r、p 値も表で出ます。計算に使う x の範囲も決められます。</p></details>
     <details><summary>論理回路や状態遷移図も描けますか?</summary><p>はい。AND・OR・NOT・NAND・NOR・XOR・XNOR・バッファ・D フリップフロップを置いて、配線を縦横に自動で引けます。状態遷移図の「状態」と矢印(直線・曲線・自分に戻るループ)も描けます。</p></details>
-    <details><summary>誤差棒つきのグラフや、白黒印刷用のグラフは作れますか?</summary><p>「レポート用の図」で作れます。誤差の列を選ぶと誤差棒がつきます。白黒印刷向けにすると、色の代わりに点の形と線の種類で区別します。図の大きさは cm で決められます。</p></details>
     <details><summary>データはどこに保存されますか?</summary><p>あなたのブラウザの中だけです。インターネットの向こう(サーバー)には送られません。別のパソコンで使うときは「ファイル → バックアップを書き出す」で持ち運べます。</p></details>
   </div>
 
   <footer class="site-foot">
     <div class="links"><a href="help.html">📖 使い方</a><a href="privacy.html">🔒 プライバシーポリシー</a></div>
     <p>マウスで操作するので、パソコンでの利用をおすすめします。</p>
-    <p>日本語フォント:Noto Sans JP / Noto Serif JP(SIL Open Font License)・ 数式:MathJax ・ PDF:jsPDF / svg2pdf.js ・ Excel:SheetJS</p>
+    <p>日本語フォント:Noto Sans JP(SIL Open Font License)・ 数式:MathJax ・ PDF:jsPDF / svg2pdf.js ・ Excel:SheetJS</p>
   </footer>
 </main>
 <script type="application/ld+json">
@@ -107,9 +100,8 @@
   "mainEntity": [
     { "@type": "Question", "name": "本当に無料ですか? 登録はいりますか?", "acceptedAnswer": { "@type": "Answer", "text": "無料で、登録もいりません。ブラウザでページを開くだけで使えます。" } },
     { "@type": "Question", "name": "作った図を LaTeX のレポートに入れられますか?", "acceptedAnswer": { "@type": "Answer", "text": "はい。「書き出す → PDF」で保存して、\\includegraphics で読み込めます。文字は線に変えて書き出すので、どのパソコンでも同じ見た目になります。" } },
-    { "@type": "Question", "name": "Excel のデータから散布図と回帰直線を作れますか?", "acceptedAnswer": { "@type": "Answer", "text": "はい。Excel や CSV を読み込んで横軸と縦軸の列を選ぶだけで、散布図と回帰直線を描きます。傾き・切片とその標準誤差、決定係数 R²、相関係数 r、p 値も表で出ます。" } },
+    { "@type": "Question", "name": "Excel のデータから散布図と回帰直線を作れますか?", "acceptedAnswer": { "@type": "Answer", "text": "はい(ベータ版です)。Excel や CSV を読み込んで横軸と縦軸の列を選ぶだけで、散布図と回帰直線を描きます。傾き・切片とその標準誤差、決定係数 R²、相関係数 r、p 値も表で出ます。" } },
     { "@type": "Question", "name": "論理回路や状態遷移図も描けますか?", "acceptedAnswer": { "@type": "Answer", "text": "はい。AND・OR・NOT・NAND・NOR・XOR・XNOR・バッファ・D フリップフロップを置いて、配線を縦横に自動で引けます。状態遷移図の状態と矢印も描けます。" } },
-    { "@type": "Question", "name": "誤差棒つきのグラフや、白黒印刷用のグラフは作れますか?", "acceptedAnswer": { "@type": "Answer", "text": "「レポート用の図」で作れます。誤差の列を選ぶと誤差棒がつき、白黒印刷向けにすると点の形と線の種類で区別します。図の大きさは cm で決められます。" } },
     { "@type": "Question", "name": "データはどこに保存されますか?", "acceptedAnswer": { "@type": "Answer", "text": "あなたのブラウザの中だけです。サーバーには送られません。別のパソコンで使うときはバックアップを書き出して持ち運べます。" } }
   ]
 }

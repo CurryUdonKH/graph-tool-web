@@ -13,7 +13,7 @@ const TOOLS = [
   ["rect", "▭ 四角", "R", "クリックで置く(ドラッグで大きさを決める)。ブロック図の「ブロック」に。"],
   ["note", "▤ 注釈", "N", "説明を書く枠。クリックで置き、「直線」ツールで指し示す線を引けます。"],
   ["text", "A 文字", "T", "枠のない文字。クリックで置く。"],
-  ["dot", "● 接続点", "J", "配線が分かれる所に置く黒い点。クリックした所のグリッドの点に置きます。点から線を引いたり、線の端を点につないだりできます。"],
+  ["dot", "● 接続点", "", "配線が分かれる所に置く黒い点。クリックした所のグリッドの点に置きます。点から線を引いたり、線の端を点につないだりできます。"],
   ["gate", "", "G", "クリックで論理ゲートを置く。入力は左の辺、出力は右の辺につなぎます(線の端がグリッドの点に合います)。"],
   ["straight", "→ 直線", "L", "図形から図形へドラッグ。同じ図形の上で離すと自分に戻る矢印(ループ)になります。"],
   ["curve", "⤻ 曲線", "C", "図形から図形へドラッグ。選ぶと出る真ん中の ● で全体のふくらみ、◇ でその側の曲がり方を変えられます(両端は動きません)。両端の ○ は図形から離して置くこともできます。同じ図形の上で離すと、自分に戻る矢印になります。"],
@@ -1650,7 +1650,7 @@ const ICON = {
   note: '<rect x="3" y="3" width="20" height="16" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 8h12M7 12h9" stroke="currentColor" stroke-width="1.5"/>',
   text: '<path d="M6 5h14M13 5v13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
   straight: '<path d="M3 17L21 5M21 5h-6M21 5v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
-  curve: '<path d="M3 18C5 6 15 4 21 8M21 8l-6-1.5M21 8l-2 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  curve: '<path d="M3 18C3 6 20 3 20 16.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M15.5 12.5 20 17.5 24.5 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   elbow: '<path d="M3 5h10v12h8M21 17l-4-3.5M21 17l-4 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   dot: '<path d="M2 11h22M13 11v9" stroke="currentColor" stroke-width="1.6"/><circle cx="13" cy="11" r="3.4" fill="currentColor"/>',
   wire: '<path d="M2 5h8v12h14" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="2.5" cy="5" r="2" fill="currentColor"/><circle cx="23" cy="17" r="2" fill="currentColor"/><path d="M10 11h6" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="11" r="2.2" fill="currentColor"/>',
@@ -1682,7 +1682,8 @@ function buildToolbar() {
   title("図形");
   for (const t of ["ellipse", "rect", "note", "text"]) pal.appendChild(btn(t, TOOL_LABEL[t], svgIcon(ICON[t])));
   title("線・矢印");
-  for (const t of ["wire", "straight", "curve", "elbow", "dot"]) pal.appendChild(btn(t, TOOL_LABEL[t], svgIcon(ICON[t])));
+  // 接続点(●)は、配線の途中から分岐すると自動でできるので、道具の欄には出さない
+  for (const t of ["wire", "straight", "curve", "elbow"]) pal.appendChild(btn(t, TOOL_LABEL[t], svgIcon(ICON[t])));
   title("論理ゲート");
   const g = document.createElement("div"); g.className = "gates"; pal.appendChild(g);
   for (const k of Object.keys(GATE_NAMES)) g.appendChild(btn("gate", k === "buf" ? "BUF" : GATE_NAMES[k], gateIcon(k), k));

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>散布図と回帰直線を無料で作成(Excel / CSV・R²・p 値)| 実験データ グラフ作成ツール</title>
+<title>散布図と回帰直線を無料で作成(Excel / CSV・R²・p 値・ベータ版)| 実験データ グラフ作成ツール</title>
 <meta name="description" content="Excel / CSV から散布図と回帰直線(最小二乗法)をブラウザだけで無料作成。傾き・切片の標準誤差、決定係数 R²、相関係数、p 値を表で出力。対数目盛り・指数表記・LaTeX の数式ラベル。理系大学生の実験レポートに。">
 <link rel="canonical" href="https://graph-tool-web.pages.dev/scatter">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -15,7 +15,7 @@
 <noscript><p style="padding:16px">Excel / CSV から散布図と回帰直線を作るツールです。使うには JavaScript を有効にしてください。 <a href="help.html">使い方</a></p></noscript>
 <header id="bar">
   <a class="brand" href="./" title="トップページへ"><img src="favicon.svg" alt="" width="22" height="22"><span>グラフ作成</span></a>
-  <nav class="apps" aria-label="道具を切り替える"><a href="diagram.html">図の作成</a><a href="scatter.html" class="on" aria-current="page">散布図</a><a href="report.html">レポート用の図</a></nav>
+  <nav class="apps" aria-label="道具を切り替える"><a href="diagram.html">図の作成</a><a href="scatter.html" class="on" aria-current="page">散布図<small>ベータ版</small></a></nav>
   <div class="doc">
     <select id="d_pick" title="前に作ったグラフを開きます" aria-label="開くグラフ"></select>
     <input id="d_name" placeholder="ファイルを読み込むと自動で決まります" title="名前。書き出すファイルの名前にもなります(空白は - になります)" aria-label="名前">
@@ -51,6 +51,7 @@
 </header>
 <main id="sc">
   <section id="left">
+    <div class="soon-note">🧪 散布図は<b>ベータ版</b>(試作版)です。使えますが、これから見た目や動きが変わることがあります。</div>
     <div id="empty" class="empty-state" hidden>
       <div class="big">📁</div>
       <p><b>Excel / CSV を読み込んでください</b></p>
