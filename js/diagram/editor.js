@@ -11,6 +11,8 @@ const TOOLS = [
   ["select", "↖ 選択", "V", "クリックで選択、ドラッグで移動。空いた所をドラッグすると範囲で選択。ダブルクリックで文字を編集。"],
   ["ellipse", "◯ 楕円", "E", "クリックで置く(ドラッグで大きさを決める)。状態遷移図の「状態」に。"],
   ["rect", "▭ 四角", "R", "クリックで置く(ドラッグで大きさを決める)。ブロック図の「ブロック」に。"],
+  ["trap", "⏢ 台形", "Z", "クリックで置く(ドラッグで大きさを決める)。右の欄で、短い辺の向きと長さを変えられます。"],
+  ["poly", "⬡ 多角形", "P", "クリックで置く(ドラッグで大きさを決める)。右の欄で角の数(3〜12)を変えられます。3 で三角形、4 でひし形。"],
   ["note", "▤ 注釈", "N", "説明を書く枠。クリックで置き、「直線」ツールで指し示す線を引けます。"],
   ["text", "A 文字", "T", "枠のない文字。クリックで置く。"],
   ["dot", "● 接続点", "", "配線が分かれる所に置く黒い点。クリックした所のグリッドの点に置きます。点から線を引いたり、線の端を点につないだりできます。"],
@@ -23,6 +25,8 @@ const TOOLS = [
 const DEF = {
   ellipse: { w: 160, h: 80, text: "状態", fontSize: 22, lw: 1.5, fill: "#ffffff" },
   rect:    { w: 160, h: 80, text: "ブロック", fontSize: 22, lw: 2, fill: "#ffffff" },
+  trap:    { w: 160, h: 80, text: "", fontSize: 22, lw: 2, fill: "#ffffff", trapDir: "top", inset: 0.2 },
+  poly:    { w: 120, h: 120, text: "", fontSize: 22, lw: 2, fill: "#ffffff", sides: 6 },
   note:    { w: 240, h: 80, text: "注釈", fontSize: 18, lw: 1, fill: "#ffffff" },
   text:    { w: 120, h: 40, text: "文字", fontSize: 18, lw: 1, fill: "none" },
   gate:    { w: 120, h: 80, text: "", fontSize: 16, lw: 2, fill: "#ffffff" },
@@ -110,11 +114,59 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const snapV = v => S.doc.snap ? Math.round(v / S.doc.grid) * S.doc.grid : Math.round(v);
 const snapP = p => ({ x: snapV(p.x), y: snapV(p.y) });
 
+// 台形・多角形の頂点(図形の枠いっぱいに広げる)
+const isPoly = s => s.type === "trap" || s.type === "poly";
+function shapePoly(s) {
+  const { x, y, w, h } = s;
+  if (s.type === "trap") {
+    const k = Math.min(0.45, Math.max(0, s.inset ?? 0.2)), dx = w * k, dy = h * k;
+    switch (s.trapDir) {
+      case "bottom": return [{ x, y }, { x: x + w, y }, { x: x + w - dx, y: y + h }, { x: x + dx, y: y + h }];
+      case "left":   return [{ x, y: y + dy }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h - dy }];
+      case "right":  return [{ x, y }, { x: x + w, y: y + dy }, { x: x + w, y: y + h - dy }, { x, y: y + h }];
+      default:       return [{ x: x + dx, y }, { x: x + w - dx, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+    }
+  }
+  const n = Math.max(3, Math.min(12, s.sides || 6));
+  const raw = Array.from({ length: n }, (_, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n; return { x: Math.cos(a), y: Math.sin(a) }; });
+  const x0 = Math.min(...raw.map(p => p.x)), x1 = Math.max(...raw.map(p => p.x)), y0 = Math.min(...raw.map(p => p.y)), y1 = Math.max(...raw.map(p => p.y));
+  return raw.map(p => ({ x: x + (p.x - x0) / (x1 - x0) * w, y: y + (p.y - y0) / (y1 - y0) * h }));
+}
+function segHit(a, b, c, d) {   // 線分 a→b と c→d が交わる所の、a→b での割合 t(交わらなければ null)
+  const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y, den = rx * sy - ry * sx;
+  if (Math.abs(den) < 1e-12) return null;
+  const t = ((c.x - a.x) * sy - (c.y - a.y) * sx) / den, u = ((c.x - a.x) * ry - (c.y - a.y) * rx) / den;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? t : null;
+}
+function inPoly(p, pts) {
+  let r = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i], b = pts[j];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) r = !r;
+  }
+  return r;
+}
+function nearestOnPoly(p, pts) {   // 輪郭の上で p にいちばん近い点
+  let best = null, bd = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], vx = b.x - a.x, vy = b.y - a.y, L = vx * vx + vy * vy || 1;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / L)), q = { x: a.x + vx * t, y: a.y + vy * t, a, b, t };
+    const d = dist(p, q);
+    if (d < bd) { bd = d; best = q; }
+  }
+  return best;
+}
 function boundary(s, t) { // 図形 s の輪郭上で、中心から t の方向にある点
   const c = ctr(s), dx = t.x - c.x, dy = t.y - c.y, rx = s.w / 2, ry = s.h / 2;
   if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return { x: c.x, y: c.y - ry };
   let k;
   if (s.type === "ellipse" || s.type === "dot") k = 1 / Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
+  else if (isPoly(s)) {   // 中心から遠くへ伸ばした線が輪郭に当たる所
+    const pts = shapePoly(s), L = (s.w + s.h) / Math.hypot(dx, dy), far = { x: c.x + dx * L, y: c.y + dy * L };
+    let tb = 1;
+    for (let i = 0; i < pts.length; i++) { const t2 = segHit(c, far, pts[i], pts[(i + 1) % pts.length]); if (t2 != null && t2 < tb) tb = t2; }
+    return { x: c.x + (far.x - c.x) * tb, y: c.y + (far.y - c.y) * tb };
+  }
   else k = Math.min(Math.abs(dx) > 1e-9 ? rx / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-9 ? ry / Math.abs(dy) : Infinity);
   return { x: c.x + dx * k, y: c.y + dy * k };
 }
@@ -137,6 +189,10 @@ function entry(s, from, to) {  // from → to の線が図形 s の輪郭に最�
     const A = vx * vx + vy * vy, B = 2 * (ox * vx + oy * vy), C = ox * ox + oy * oy - 1, D = B * B - 4 * A * C;
     if (C <= 0 || A < 1e-9 || D < 0) return null;            // 始まりが図形の中なら何もしない
     t = (-B - Math.sqrt(D)) / (2 * A);
+  } else if (isPoly(s)) {
+    const pts = shapePoly(s);
+    if (inPoly(from, pts)) return null;
+    for (let i = 0; i < pts.length; i++) { const t2 = segHit(from, to, pts[i], pts[(i + 1) % pts.length]); if (t2 != null && (t == null || t2 < t)) t = t2; }
   } else {
     if (from.x > s.x && from.x < s.x + s.w && from.y > s.y && from.y < s.y + s.h) return null;
     let t0 = 0, t1 = 1;
@@ -176,6 +232,8 @@ function shapeAt(p, exclude) {
     } else if (s.type === "ellipse") {
       const c = ctr(s);
       if (((p.x - c.x) / (s.w / 2)) ** 2 + ((p.y - c.y) / (s.h / 2)) ** 2 <= 1) return s;
+    } else if (isPoly(s)) {
+      if (inPoly(p, shapePoly(s))) return s;
     } else if (p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h) return s;
   }
   return null;
@@ -208,6 +266,13 @@ function endpointAt(p, exclude) { // マウスの位置にある図形につな�
     let a = Math.atan2((b.y - c.y) / (s.h / 2), (b.x - c.x) / (s.w / 2));
     if (S.doc.snap) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
     return { id: s.id, ang: a };
+  }
+  if (isPoly(s)) {   // 真ん中の方 → 向きに合わせて自動。輪郭の近く → いちばん近い所(角・辺の真ん中に近ければそこ)
+    const q = nearestOnPoly(p, shapePoly(s));
+    if (shapeAt(p) === s && dist(p, q) > px(EDGE_BAND + 4)) return { id: s.id };
+    let at = q;
+    for (const k of [0, 1, 0.5]) { const r = { x: q.a.x + (q.b.x - q.a.x) * k, y: q.a.y + (q.b.y - q.a.y) * k }; if (dist(r, q) < px(10)) { at = r; break; } }
+    return { id: s.id, ax: (at.x - s.x) / s.w, ay: (at.y - s.y) / s.h };
   }
   // 一番近い辺に乗せ、辺にそった位置もグリッドに合わせる
   const d = { l: Math.abs(p.x - s.x), r: Math.abs(s.x + s.w - p.x), t: Math.abs(p.y - s.y), b: Math.abs(s.y + s.h - p.y) };
@@ -245,9 +310,10 @@ function loopEnds(s, dirDeg) {
 function anchorOn(s, b) {        // 輪郭の上の点 b を、図形への取り付け位置にする
   if (s.type === "dot") return { id: s.id, ax: 0.5, ay: 0.5 };
   if (s.type === "gate") {        // 論理ゲートは、いちばん近い端子につなぐ
-    const pin = gatePins(s).reduce((a, b) => dist(p, { x: s.x + a.ax * s.w, y: s.y + a.ay * s.h }) <= dist(p, { x: s.x + b.ax * s.w, y: s.y + b.ay * s.h }) ? a : b);
+    const pin = gatePins(s).reduce((p, q) => dist(b, { x: s.x + p.ax * s.w, y: s.y + p.ay * s.h }) <= dist(b, { x: s.x + q.ax * s.w, y: s.y + q.ay * s.h }) ? p : q);
     return { id: s.id, ...pin };
   }
+  if (isPoly(s)) return { id: s.id, ax: (b.x - s.x) / s.w, ay: (b.y - s.y) / s.h };
   if (s.type === "ellipse") { const c = ctr(s); return { id: s.id, ang: Math.atan2((b.y - c.y) / (s.h / 2), (b.x - c.x) / (s.w / 2)) }; }
   const d = { l: Math.abs(b.x - s.x), r: Math.abs(s.x + s.w - b.x), t: Math.abs(b.y - s.y), b: Math.abs(s.y + s.h - b.y) };
   const side = Object.keys(d).reduce((p, q) => d[p] <= d[q] ? p : q);
@@ -479,11 +545,12 @@ function buildPrims() {
     const c = ctr(s), base = { lw: s.lw, dash: !!s.dash, fill: s.fill === "none" ? null : s.fill };
     if (s.type === "ellipse" || s.type === "dot") out.push({ k: "ellipse", cx: c.x, cy: c.y, rx: s.w / 2, ry: s.h / 2, ...base });
     else if (s.type === "gate") out.push(...gatePrims(s));
+    else if (isPoly(s)) out.push({ k: "path", cmds: [...shapePoly(s).map((q, i) => [i ? "L" : "M", q.x, q.y]), ["Z"]], ...base });
     else if (s.type !== "text") out.push({ k: "rect", x: s.x, y: s.y, w: s.w, h: s.h, ...base });
     if (s.text) {
       const [al, va] = textAlign(s);
       // 寄せる側の余白:楕円は丸い分だけ内側へ、それ以外は少しだけ
-      const ix = s.type === "ellipse" ? s.w * 0.16 : 8, iy = s.type === "ellipse" ? s.h * 0.16 : 6;
+      const ix = s.type === "ellipse" || isPoly(s) ? s.w * 0.2 : 8, iy = s.type === "ellipse" || isPoly(s) ? s.h * 0.16 : 6;
       const cx = s.type === "gate" ? s.x + s.w * 0.47 : c.x;
       const x = al === "left" ? s.x + ix : al === "right" ? s.x + s.w - ix : cx;
       const y = va === "top" ? s.y + iy : va === "bottom" ? s.y + s.h - iy : c.y;
@@ -1647,6 +1714,8 @@ const ICON = {
   select: '<path d="M6 3l12 9-5.5 1L15 19l-2.5 1.2-2.6-6L6 17z" fill="currentColor"/>',
   ellipse: '<ellipse cx="13" cy="11" rx="10" ry="7" fill="none" stroke="currentColor" stroke-width="1.8"/>',
   rect: '<rect x="3" y="4" width="20" height="14" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+  trap: '<path d="M8 4h10l5 14H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+  poly: '<path d="M13 2l8.5 4.75v9.5L13 21l-8.5-4.75v-9.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
   note: '<rect x="3" y="3" width="20" height="16" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 8h12M7 12h9" stroke="currentColor" stroke-width="1.5"/>',
   text: '<path d="M6 5h14M13 5v13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
   straight: '<path d="M3 17L21 5M21 5h-6M21 5v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -1665,7 +1734,7 @@ function gateIcon(kind) {   // 実際の形(gatePrims)を小さく描いたア�
     : `<path d="${dStr(p.cmds)}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>`).join("");
   return svgIcon(body, "0 0 60 40");
 }
-const TOOL_LABEL = { select: "選択", ellipse: "楕円", rect: "四角", note: "注釈", text: "文字", straight: "直線", curve: "曲線", elbow: "直角線", dot: "接続点", wire: "配線" };
+const TOOL_LABEL = { select: "選択", ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", straight: "直線", curve: "曲線", elbow: "直角線", dot: "接続点", wire: "配線" };
 function buildToolbar() {
   const pal = $("palette");
   const btn = (tool, label, icon, extra) => {
@@ -1680,7 +1749,7 @@ function buildToolbar() {
   const title = t => { const d = document.createElement("div"); d.className = "ptitle"; d.textContent = t; pal.appendChild(d); };
   pal.appendChild(btn("select", "選択", svgIcon(ICON.select)));
   title("図形");
-  for (const t of ["ellipse", "rect", "note", "text"]) pal.appendChild(btn(t, TOOL_LABEL[t], svgIcon(ICON[t])));
+  for (const t of ["ellipse", "rect", "trap", "poly", "note", "text"]) pal.appendChild(btn(t, TOOL_LABEL[t], svgIcon(ICON[t])));
   title("線・矢印");
   // 接続点(●)は、配線の途中から分岐すると自動でできるので、道具の欄には出さない
   for (const t of ["wire", "straight", "curve", "elbow"]) pal.appendChild(btn(t, TOOL_LABEL[t], svgIcon(ICON[t])));
@@ -1721,7 +1790,7 @@ const seg = (key, opts, cur) => `<div class="seg" data-key="${key}">` + opts.map
   `<button data-v="${v}" class="${String(v) === String(cur) ? "on" : ""}" title="${tip || ""}">${label}</button>`).join("") + `</div>`;
 const sicon = n => `<svg viewBox="0 0 24 16">${SIDE_ICON[n]}</svg>`;
 const aicon = n => `<svg viewBox="0 0 24 24">${ALIGN_ICON[n]}</svg>`;
-const KIND_NAME = { ellipse: "楕円", rect: "四角", note: "注釈", text: "文字", gate: "論理ゲート", dot: "接続点", edge: "矢印・線" };
+const KIND_NAME = { ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", gate: "論理ゲート", dot: "接続点", edge: "矢印・線" };
 
 function underlayHTML() {
   const u = S.doc.underlay;
@@ -1776,6 +1845,15 @@ function sideHTML(items) {
   h += `<div class="sec"><h4>線の種類</h4>${seg("dash", [["0", sicon("solid"), "実線"], ["1", sicon("dash"), "点線"]], items.every(i => i.dash) ? "1" : items.every(i => !i.dash) ? "0" : "")}</div>`;
   if (shapesSel.length) {
     h += `<div class="sec"><h4>塗り</h4>${seg("fill", [["#ffffff", "白でぬる"], ["none", "なし(透明)"]], shapesSel.every(i => i.fill === "none") ? "none" : shapesSel.every(i => i.fill !== "none") ? "#ffffff" : "")}</div>`;
+    if (shapesSel.every(i => i.type === "trap")) {
+      const dir = same("trapDir") || "", ins = shapesSel.every(i => (i.inset ?? 0.2) === (one.inset ?? 0.2)) ? one.inset ?? 0.2 : 0.2;
+      h += `<div class="sec"><h4>短い辺</h4>${seg("trapdir", [["top", "上"], ["bottom", "下"], ["left", "左"], ["right", "右"]], dir)}
+        <div style="margin-top:8px" class="row"><span style="font-size:12px;color:var(--muted)" title="右にするほど短い辺が短くなります">縮め方</span>
+        <input type="range" class="slider" id="p_inset" min="0" max="0.45" step="0.05" value="${ins}"></div></div>`;
+    }
+    if (shapesSel.every(i => i.type === "poly"))
+      h += `<div class="sec"><h4>角の数</h4><div class="stepper"><button id="sides_minus">−</button><input type="number" id="p_sides" min="3" max="12" value="${same("sides")}"><button id="sides_plus">＋</button></div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:5px">3 で三角形、4 でひし形、6 で六角形</div></div>`;
     if (shapesSel.length === 1 && one.type === "gate")
       h += `<div class="sec"><h4>ゲートの種類</h4><select id="p_gate" style="width:100%">${Object.entries(GATE_NAMES).map(([v, l]) => `<option value="${v}" ${v === one.kind ? "selected" : ""}>${l}</option>`).join("")}</select></div>`
          + (["not", "buf", "dff"].includes(one.kind) ? "" : `<div class="sec"><h4>入力の数</h4><div class="stepper"><button id="nin_minus" title="入力を 1 本減らす">−</button><input type="number" id="p_nin" min="2" max="8" value="${gateIns(one)}"><button id="nin_plus" title="入力を 1 本増やす">＋</button></div></div>`);
@@ -1840,6 +1918,7 @@ function bindSide() {
     const k = sg.dataset.key, v = b.dataset.v;
     if (k === "dotsize") set(i => { const c = ctr(i); i.w = i.h = +v; i.x = c.x - i.w / 2; i.y = c.y - i.h / 2; });
     else if (k === "lw") set(i => i.lw = +v);
+    else if (k === "trapdir") set(i => { if (i.type === "trap") i.trapDir = v; });
     else if (k === "dash") set(i => i.dash = v === "1");
     else if (k === "align") set(i => { if (isShape(i)) i.align = v; });
     else if (k === "valign") set(i => { if (isShape(i)) i.valign = v; });
@@ -1858,6 +1937,12 @@ function bindSide() {
   on("fs_minus", "click", () => fs(-2)); on("fs_plus", "click", () => fs(2));
   on("p_fs", "change", e => { const v = +e.target.value; if (v >= 6) set(i => i.fontSize = v); });
   on("p_text", "click", () => openEditor(items[0]));
+  on("p_inset", "input", e => { items.forEach(i => { if (i.type === "trap") i.inset = +e.target.value; }); render(); });
+  on("p_inset", "pointerdown", () => pushHist());
+  on("p_inset", "change", () => commit());
+  const sides = n => { n = Math.max(3, Math.min(12, n)); set(i => { if (i.type === "poly") i.sides = n; }); };
+  on("sides_minus", "click", () => sides((+$("p_sides").value || 6) - 1)); on("sides_plus", "click", () => sides((+$("p_sides").value || 6) + 1));
+  on("p_sides", "change", e => sides(+e.target.value || 6));
   on("p_branch", "click", () => { S.sel = []; setTool("wire"); });
   on("p_gate", "change", e => set(i => {
     const was = i.kind; i.kind = e.target.value;
