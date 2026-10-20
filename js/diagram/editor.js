@@ -405,11 +405,16 @@ function edgeGeom(e) {
   g.label = { x: g.labelBase.x + (e.lx || 0), y: g.labelBase.y + (e.ly || 0) };
   return g;
 }
-function headCmds(tip, from, lw) {
-  const a = Math.atan2(tip.y - from.y, tip.x - from.x), sp = 0.42, L = 9 + lw * 3;
-  return [["M", tip.x - L * Math.cos(a - sp), tip.y - L * Math.sin(a - sp)], ["L", tip.x, tip.y],
-          ["L", tip.x - L * Math.cos(a + sp), tip.y - L * Math.sin(a + sp)]];
+// 矢印の先っぽ。head が "fill" なら塗った三角、それ以外は開いた形(線 2 本)
+function headCmds(tip, from, lw, head) {
+  const a = Math.atan2(tip.y - from.y, tip.x - from.x), sp = head === "fill" ? 0.36 : 0.42, L = 9 + lw * 3;
+  const c = [["M", tip.x - L * Math.cos(a - sp), tip.y - L * Math.sin(a - sp)], ["L", tip.x, tip.y],
+             ["L", tip.x - L * Math.cos(a + sp), tip.y - L * Math.sin(a + sp)]];
+  return head === "fill" ? [...c, ["Z"]] : c;
 }
+// 新しく引く矢印は、最後に選んだ矢じりの形にする
+const lastHead = () => { try { return localStorage.getItem("diagram_head") === "fill" ? { head: "fill" } : {}; } catch (e) { return {}; } };
+const headPrim = (e, tip, from) => ({ k: "path", cmds: headCmds(tip, from, e.lw, e.head), lw: e.lw, fill: e.head === "fill" ? "#000000" : null });
 
 // ------------------------------------------------------------------ 論理ゲートの形
 // 右向き。入力は左の辺(2 入力なら高さの 1/4 と 3/4、1 入力なら真ん中)、出力は右の辺の真ん中。
@@ -561,8 +566,8 @@ function buildPrims() {
     if (!edgeOk(e)) continue;
     const g = edgeGeom(e);
     out.push({ k: "path", cmds: g.cmds, lw: e.lw, dash: !!e.dash });
-    if (e.arrow !== "none") out.push({ k: "path", cmds: headCmds(g.end, g.endFrom, e.lw), lw: e.lw });
-    if (e.arrow === "both") out.push({ k: "path", cmds: headCmds(g.start, g.startFrom, e.lw), lw: e.lw });
+    if (e.arrow !== "none") out.push(headPrim(e, g.end, g.endFrom));
+    if (e.arrow === "both") out.push(headPrim(e, g.start, g.startFrom));
     if (e.label) out.push({ k: "text", x: g.label.x, y: g.label.y, s: e.label, size: e.fontSize, ha: "center", va: "center", src: e.id });
   }
   // 端子の位置での分岐点:くっついて重なった端子どうしも 1 本のつながりとして数え、3 つ以上つながっていれば ● を描く
@@ -1531,7 +1536,7 @@ function createEdge(from, to, start, p) {
   if (dist(start, p) < 10) { if (S.histPushed) { S.histPushed = false; undo(); S.fut.pop(); } else render(); return; }   // クリックしただけ(分岐も取り消す)
   if (!S.histPushed) pushHist();
   S.histPushed = false;
-  const e = { id: S.doc.nextId++, type: "edge", style: S.tool, from, to, label: "", fontSize: 18, lw: 1.5, arrow: "end", dash: false };
+  const e = { id: S.doc.nextId++, type: "edge", style: S.tool, from, to, label: "", fontSize: 18, lw: 1.5, arrow: "end", dash: false, ...lastHead() };
   if (S.tool === "curve") e.bend = 40;
   if (from.id != null && from.id === to.id) makeLoop(e);
   // 論理ゲートや接続点につながる配線は、矢印なしの縦横の線にする(斜めにしない)
@@ -1570,7 +1575,7 @@ function finishElbow(to) {
   if (!S.histPushed) pushHist();
   S.histPushed = false;
   const wire = [d.from, to].some(x => x.id != null && ["gate", "dot"].includes(get(x.id)?.type));
-  const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from: d.from, to, points: simplify(refPt(d.from), pts, refPt(to)), label: "", fontSize: 18, lw: wire ? wireLw(d.from, to) : 1.5, arrow: wire ? "none" : "end", dash: false, wire };
+  const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from: d.from, to, points: simplify(refPt(d.from), pts, refPt(to)), label: "", fontSize: 18, lw: wire ? wireLw(d.from, to) : 1.5, arrow: wire ? "none" : "end", dash: false, wire, ...(wire ? {} : lastHead()) };
   S.doc.items.push(e);
   S.sel = [e.id]; S.tool = "select";   // 置いたら選択に戻る
   commit(); updateCursor();
@@ -1692,6 +1697,8 @@ document.addEventListener("keydown", ev => {
   else if (mod && k === "c") { copySel(); }
   else if (mod && k === "v") { ev.preventDefault(); paste(); }
   else if (mod && k === "d") { ev.preventDefault(); copySel(); paste(); }
+  else if (mod && (k === "]" || k === "}")) { ev.preventDefault(); restack(ev.shiftKey ? "front" : "up"); }
+  else if (mod && (k === "[" || k === "{")) { ev.preventDefault(); restack(ev.shiftKey ? "back" : "down"); }
   else if (mod && k === "a") { ev.preventDefault(); S.sel = S.doc.items.map(i => i.id); render(); }
   else if (k === "+" || k === "=" || k === ";") { ev.preventDefault(); zoomStep(1); }
   else if (k === "-") { ev.preventDefault(); zoomStep(-1); }
@@ -1769,6 +1776,8 @@ function buildToolbar() {
 const SIDE_ICON = {
   arrowNone: '<path d="M2 8h20" stroke="currentColor" stroke-width="2"/>',
   arrowEnd: '<path d="M2 8h18M15 3.5l5 4.5-5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  headOpen: '<path d="M2 8h19M14 3l7 5-7 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  headFill: '<path d="M2 8h13" stroke="currentColor" stroke-width="2"/><path d="M13 3l9 5-9 5z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
   arrowBoth: '<path d="M4 8h16M9 3.5 4 8l5 4.5M15 3.5l5 4.5-5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   straight: '<path d="M2 13 22 3" stroke="currentColor" stroke-width="2" fill="none"/>',
   curve: '<path d="M2 14C6 2 16 2 22 6" stroke="currentColor" stroke-width="2" fill="none"/>',
@@ -1841,10 +1850,16 @@ function sideHTML(items) {
       <div style="height:6px"></div>${seg("valign", [["top", "上"], ["middle", "中"], ["bottom", "下"]], va)}</div>`;
   }
   h += `<div class="sec"><h4>文字の大きさ</h4><div class="stepper"><button id="fs_minus">−</button><input type="number" id="p_fs" min="6" max="96" value="${same("fontSize")}"><button id="fs_plus">＋</button></div></div>`;
-  h += `<div class="sec"><h4>線の太さ</h4>${seg("lw", [[1, "細"], [1.5, "標準"], [2, "太"], [3, "極太"]], same("lw"))}</div>`;
+  h += `<div class="sec"><h4>線の太さ</h4>${seg("lw", [[1, "細"], [1.5, "標準"], [2, "太"], [3, "極太"]], same("lw"))}
+    <div class="row" style="margin-top:6px"><div class="stepper"><button id="lw_minus" title="0.25 pt 細くする">−</button><input type="number" id="p_lw" min="0.25" max="20" step="0.25" value="${same("lw")}" title="線の太さ(pt)。書き出した図でもこの太さになります"><button id="lw_plus" title="0.25 pt 太くする">＋</button></div>
+    <span style="font-size:12px;color:var(--muted)">pt(ポイント)</span></div></div>`;
   h += `<div class="sec"><h4>線の種類</h4>${seg("dash", [["0", sicon("solid"), "実線"], ["1", sicon("dash"), "点線"]], items.every(i => i.dash) ? "1" : items.every(i => !i.dash) ? "0" : "")}</div>`;
   if (shapesSel.length) {
     h += `<div class="sec"><h4>塗り</h4>${seg("fill", [["#ffffff", "白でぬる"], ["none", "なし(透明)"]], shapesSel.every(i => i.fill === "none") ? "none" : shapesSel.every(i => i.fill !== "none") ? "#ffffff" : "")}</div>`;
+    const k = navigator.platform.includes("Mac") ? "⌘" : "Ctrl+";
+    h += `<div class="sec"><h4>重なりの順番</h4><div class="grid2">
+      <button class="btn" data-stack="front" title="いちばん前に出す(${k}Shift+])">⇈ 最前面へ</button><button class="btn" data-stack="up" title="1 つ前に出す(${k}])">↑ 1 つ前へ</button>
+      <button class="btn" data-stack="back" title="いちばん後ろに下げる(${k}Shift+[)">⇊ 最背面へ</button><button class="btn" data-stack="down" title="1 つ後ろに下げる(${k}[)">↓ 1 つ後ろへ</button></div></div>`;
     if (shapesSel.every(i => i.type === "trap")) {
       const dir = same("trapDir") || "", ins = shapesSel.every(i => (i.inset ?? 0.2) === (one.inset ?? 0.2)) ? one.inset ?? 0.2 : 0.2;
       h += `<div class="sec"><h4>短い辺</h4>${seg("trapdir", [["top", "上"], ["bottom", "下"], ["left", "左"], ["right", "右"]], dir)}
@@ -1860,7 +1875,13 @@ function sideHTML(items) {
   }
   if (edgesSel.length) {
     const arrows = edgesSel.every(e => e.arrow === edgesSel[0].arrow) ? edgesSel[0].arrow : "";
-    h += `<div class="sec"><h4>矢印</h4>${seg("arrow", [["none", sicon("arrowNone"), "矢印なし"], ["end", sicon("arrowEnd"), "終点に矢印"], ["both", sicon("arrowBoth"), "両端に矢印"]], arrows)}</div>`;
+    h += `<div class="sec"><h4>矢印</h4>${seg("arrow", [["none", sicon("arrowNone"), "矢印なし"], ["end", sicon("arrowEnd"), "終点に矢印"], ["both", sicon("arrowBoth"), "両端に矢印"]], arrows)}`;
+    const heads = edgesSel.filter(e => e.arrow !== "none");
+    if (heads.length) {
+      const hd = heads.every(e => (e.head === "fill") === (heads[0].head === "fill")) ? (heads[0].head === "fill" ? "fill" : "open") : "";
+      h += `<div style="height:6px"></div>${seg("head", [["open", sicon("headOpen") + " 開いた形", "線 2 本の矢じり"], ["fill", sicon("headFill") + " 三角", "塗りつぶした三角の矢じり"]], hd)}`;
+    }
+    h += `</div>`;
     if (edgesSel.length === 1) {
       h += `<div class="sec"><h4>線の形</h4>${seg("style", [["straight", sicon("straight"), "直線"], ["curve", sicon("curve"), "曲線"], ["elbow", sicon("elbow"), "直角"]], one.style)}</div>`;
       if (one.style !== "curve")
@@ -1878,12 +1899,38 @@ function sideHTML(items) {
       <button class="btn" data-align="vdist" title="縦に等間隔で並べる">${aicon("vdist")} 縦に等間隔</button></div>` : "") + `</div>`;
   }
   if (shapesSel.length) {
-    h += `<div class="sec"><h4>配置</h4><div class="grid2">
-      <button class="btn" id="p_front" title="いちばん前に出す">前面へ</button><button class="btn" id="p_back" title="いちばん後ろに下げる">背面へ</button></div>
-      <button class="btn wide" id="p_snap" style="margin-top:6px" title="位置と大きさをグリッドに合わせます">グリッドに合わせる</button></div>`;
+    h += `<div class="sec"><button class="btn wide" id="p_snap" title="位置と大きさをグリッドに合わせます">グリッドに合わせる</button></div>`;
   }
   h += `<div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   return h;
+}
+// 図形の重なりの順番を変える(線・矢印はいつも図形より前に描く)。
+// 1 つずつ動かすときは、重なっている図形を 1 つ越えるまで動かす(重なっていない図形と入れ替えても見た目が変わらないため)
+function restack(mode) {
+  const sel = new Set(selItems().filter(isShape));
+  if (!sel.size) return;
+  const all = S.doc.items, pos = all.map((it, k) => isShape(it) ? k : -1).filter(k => k >= 0);
+  let order = pos.map(k => all[k]);
+  if (mode === "front") order = [...order.filter(i => !sel.has(i)), ...order.filter(i => sel.has(i))];
+  else if (mode === "back") order = [...order.filter(i => sel.has(i)), ...order.filter(i => !sel.has(i))];
+  else {
+    const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const up = mode === "up";
+    if (!up) order.reverse();
+    for (let j = order.length - 1; j >= 0; j--) {        // 前の方にあるものから動かす
+      const it = order[j];
+      if (!sel.has(it)) continue;
+      let t = j + 1;
+      while (t < order.length && (sel.has(order[t]) || !hit(it, order[t]))) t++;
+      if (t >= order.length) continue;
+      order.splice(j, 1); order.splice(t, 0, it);
+    }
+    if (!up) order.reverse();
+  }
+  if (order.every((it, j) => all[pos[j]] === it)) return;   // もう端にある
+  pushHist();
+  const next = all.slice(); pos.forEach((k, j) => next[k] = order[j]); S.doc.items = next;
+  commit();
 }
 function alignShapes(mode) {
   const sh = selItems().filter(isShape);
@@ -1918,6 +1965,10 @@ function bindSide() {
     const k = sg.dataset.key, v = b.dataset.v;
     if (k === "dotsize") set(i => { const c = ctr(i); i.w = i.h = +v; i.x = c.x - i.w / 2; i.y = c.y - i.h / 2; });
     else if (k === "lw") set(i => i.lw = +v);
+    else if (k === "head") {
+      try { localStorage.setItem("diagram_head", v); } catch (e) {}
+      set(i => { if (!isShape(i)) { if (v === "fill") i.head = "fill"; else delete i.head; } });
+    }
     else if (k === "trapdir") set(i => { if (i.type === "trap") i.trapDir = v; });
     else if (k === "dash") set(i => i.dash = v === "1");
     else if (k === "align") set(i => { if (isShape(i)) i.align = v; });
@@ -1968,8 +2019,10 @@ function bindSide() {
     i.x = Math.round(i.x / g) * g; i.y = Math.round(i.y / g) * g;
     i.w = Math.max(g, x1 - i.x); i.h = Math.max(g, y1 - i.y);
   }));
-  on("p_front", "click", () => set(i => { S.doc.items = S.doc.items.filter(x => x !== i); S.doc.items.push(i); }));
-  on("p_back", "click", () => set(i => { S.doc.items = S.doc.items.filter(x => x !== i); S.doc.items.unshift(i); }));
+  document.querySelectorAll("#side [data-stack]").forEach(b => b.onclick = () => restack(b.dataset.stack));
+  const lw = d => { const v = Math.round(Math.max(0.25, Math.min(20, (+$("p_lw").value || one(items).lw || 1.5) + d)) * 100) / 100; set(i => i.lw = v); };
+  on("lw_minus", "click", () => lw(-0.25)); on("lw_plus", "click", () => lw(0.25));
+  on("p_lw", "change", e => { const v = +e.target.value; if (v > 0) set(i => i.lw = Math.min(20, v)); });
   on("p_delete", "click", delSel);
   document.querySelectorAll("#side [data-align]").forEach(b => b.onclick = () => alignShapes(b.dataset.align));
 }
