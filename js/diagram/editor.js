@@ -606,12 +606,28 @@ function drawText(p, parent) {   // 文字と $...$ の数式(並べ方は text.
   for (const er of L.errors) if (!S.mathErr.some(x => x.tex === er.tex)) S.mathErr.push(er);
   el("g", {}, parent).innerHTML = textMarkup(L, p.x, p.y);
 }
+// 描ける広さ:決めた大きさ(W×H)より、描いたものの右下に余白を足した所や、見えている所が広ければそこまで広げる。
+// 右や下へ図形を動かすと、そのぶんグリッドも続く(図には保存しない。書き出す範囲は描いたものだけ)
+function viewSize() {
+  const d = S.doc, wr = $("wrap");
+  let mx = 0, my = 0;
+  const add = (x, y) => { if (x > mx) mx = x; if (y > my) my = y; };
+  for (const it of d.items) {
+    if (isShape(it)) add(it.x + it.w, it.y + it.h);
+    else { for (const e of [it.from, it.to]) if (e && e.id == null) add(e.x, e.y); for (const q of it.points || []) add(q.x, q.y); }
+  }
+  const step = d.grid * 5, up = v => Math.ceil(v / step) * step;
+  // 見えている所ぴったりまで(切り上げると、縮小したときにいらないスクロールバーが出るため)
+  return { w: Math.max(up(Math.max(d.W, mx + 800)), wr ? Math.floor(wr.clientWidth / S.zoom) : 0),
+           h: Math.max(up(Math.max(d.H, my + 600)), wr ? Math.floor(wr.clientHeight / S.zoom) : 0) };
+}
 function render() {
   svg.innerHTML = "";
   S.mathErr = [];
-  const d = S.doc;
-  svg.setAttribute("width", d.W * S.zoom); svg.setAttribute("height", d.H * S.zoom);
-  svg.setAttribute("viewBox", `0 0 ${d.W} ${d.H}`);
+  const d = S.doc, vs = viewSize();
+  S.vw = vs.w; S.vh = vs.h;
+  svg.setAttribute("width", vs.w * S.zoom); svg.setAttribute("height", vs.h * S.zoom);
+  svg.setAttribute("viewBox", `0 0 ${vs.w} ${vs.h}`);
   if (d.showGrid) {
     const defs = el("defs", {});
     const pat = el("pattern", { id: "grid", width: d.grid * 5, height: d.grid * 5, patternUnits: "userSpaceOnUse" }, defs);
@@ -620,7 +636,7 @@ function render() {
       el("line", { x1: v, y1: 0, x2: v, y2: d.grid * 5, stroke: c, "stroke-width": 1 }, pat);
       el("line", { x1: 0, y1: v, x2: d.grid * 5, y2: v, stroke: c, "stroke-width": 1 }, pat);
     }
-    el("rect", { x: 0, y: 0, width: d.W, height: d.H, fill: "url(#grid)" });
+    el("rect", { x: 0, y: 0, width: vs.w, height: vs.h, fill: "url(#grid)" });
   }
   const u = d.underlay;
   if (u && u.src && u.visible !== false)
@@ -1372,12 +1388,12 @@ function dragMoveInner(d, p) {
         for (const mine of [0, s0.w / 2, s0.w])                                   // 自分の 左・中心・右
           for (const ox of [o.x, o.x + o.w / 2, o.x + o.w]) {                    // 相手の 左・中心・右
             const dd = Math.abs(raw.x + mine - ox);
-            if (dd < best.x) { best.x = dd; if (!S.doc.snap) tx = ox - mine; S.guides[0] = { x1: ox, y1: 0, x2: ox, y2: S.doc.H }; }
+            if (dd < best.x) { best.x = dd; if (!S.doc.snap) tx = ox - mine; S.guides[0] = { x1: ox, y1: 0, x2: ox, y2: S.vh || S.doc.H }; }
           }
         for (const mine of [0, s0.h / 2, s0.h])
           for (const oy of [o.y, o.y + o.h / 2, o.y + o.h]) {
             const dd = Math.abs(raw.y + mine - oy);
-            if (dd < best.y) { best.y = dd; if (!S.doc.snap) ty = oy - mine; S.guides[1] = { x1: 0, y1: oy, x2: S.doc.W, y2: oy }; }
+            if (dd < best.y) { best.y = dd; if (!S.doc.snap) ty = oy - mine; S.guides[1] = { x1: 0, y1: oy, x2: S.vw || S.doc.W, y2: oy }; }
           }
       }
       S.guides = S.guides.filter(Boolean);
@@ -2112,6 +2128,8 @@ $("z_out").onclick = () => zoomStep(-1);
 $("z_reset").onclick = () => setZoom(1);
 $("z_fit").onclick = zoomFit;
 // ⌘ + スクロール / ピンチ で拡大・縮小(サイト全体ではなく、この画面だけ)
+let resizeT = null;
+window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(render, 100); });
 wrap.addEventListener("wheel", ev => {
   if (!(ev.ctrlKey || ev.metaKey)) return;
   ev.preventDefault();
