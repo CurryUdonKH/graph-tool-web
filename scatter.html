@@ -14,8 +14,11 @@
 <body>
 <noscript><p style="padding:16px">Excel / CSV から散布図と回帰直線を作るツールです。使うには JavaScript を有効にしてください。 <a href="help.html">使い方</a></p></noscript>
 <header id="bar">
+  <div class="bar-navigation">
   <a class="brand" href="./" title="トップページへ"><img src="favicon.svg" alt="" width="22" height="22"><span>グラフ作成</span></a>
   <nav class="apps" aria-label="道具を切り替える"><a href="diagram.html">図の作成</a><a href="scatter.html" class="on" aria-current="page">散布図<small>ベータ版</small></a></nav>
+  </div>
+  <div class="bar-document">
   <div class="doc">
     <select id="d_pick" title="前に作ったグラフを開きます" aria-label="開くグラフ"></select>
     <input id="d_name" placeholder="ファイルを読み込むと自動で決まります" title="名前。書き出すファイルの名前にもなります(空白は - になります)" aria-label="名前">
@@ -41,14 +44,26 @@
       <button class="item" id="m_about">ⓘ 保存について</button>
     </div>
   </div>
+  </div>
 </header>
 <main id="sc">
+  <aside id="panel">
+    <div class="scatter-heading"><b>グラフの設定</b><span>データを選び、表示を調整</span></div>
+    <nav id="tabs">
+      <button data-tab="data" class="on">データ</button>
+      <button data-tab="fit">回帰直線</button>
+      <button data-tab="label">ラベル・数式</button>
+      <button data-tab="axis">軸・目盛り</button>
+    </nav>
+    <div id="tab_body"></div>
+  </aside>
   <section id="left">
+    <div class="plot-heading"><div><b>グラフ</b><span>読み込んだデータの仕上がり</span></div><span class="plot-format">PDF・PNG・SVG に書き出し</span></div>
     <div class="soon-note">🧪 散布図は<b>ベータ版</b>(試作版)です。使えますが、これから見た目や動きが変わることがあります。</div>
     <div id="empty" class="empty-state" hidden>
       <div class="big">📁</div>
       <p><b>Excel / CSV を読み込んでください</b></p>
-      <p class="sub">右の「データ」の欄か、このページのどこかにファイルをドラッグしても読み込めます。<br>読み込むとグラフができて、自動で保存されます。</p>
+      <p class="sub">「データ」の欄か、このページのどこかにファイルをドラッグしても読み込めます。<br>読み込むとグラフができて、自動で保存されます。</p>
       <button class="btn primary" id="empty_pick">ファイルを選ぶ</button>
     </div>
     <div id="plot_wrap"><svg id="plot" xmlns="http://www.w3.org/2000/svg"></svg></div>
@@ -60,15 +75,6 @@
       <div id="data_table"></div>
     </details>
   </section>
-  <aside id="panel">
-    <nav id="tabs">
-      <button data-tab="data" class="on">データ</button>
-      <button data-tab="fit">回帰直線</button>
-      <button data-tab="label">ラベル・数式</button>
-      <button data-tab="axis">軸・目盛り</button>
-    </nav>
-    <div id="tab_body"></div>
-  </aside>
 </main>
 <input type="file" id="f_data" accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv" multiple hidden>
 <div id="drop_cover">ここで離すとファイルを読み込みます</div>

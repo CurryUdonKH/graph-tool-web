@@ -94,3 +94,36 @@ details.gear > div { padding: var(--size-8px) 0 var(--size-2px); }
 #drop { border-color: var(--color-hex-afc3db); background: var(--surface-soft); }
 #tabs button { font-size: var(--size-12px); white-space: nowrap; }
 @media (max-width: 1100px) and (min-width: 901px) { #panel { width: 360px; } }
+/* グラフと設定を別の作業領域として見せる */
+#left { padding: var(--ui-size-24px); background: var(--ui-color-hex-eef2f8); }
+#panel { width: 400px; border-left-color: var(--ui-color-hex-dce3ee); }
+#tabs { padding: var(--ui-size-8px); gap: var(--ui-size-4px); background: var(--ui-color-hex-f6f8fc); }
+#tabs button { border: 0; margin: 0; border-radius: var(--ui-size-8px); padding: var(--ui-size-12px) var(--ui-size-4px); }
+#tabs button.on { background: var(--ui-color-hex-fff); color: var(--ui-color-hex-284b98); box-shadow: 0 2px 8px var(--ui-color-rgba-30-50-90-1); }
+#tab_body { padding: var(--ui-size-24px) var(--ui-size-16px); }
+.empty-state { border: 1px solid var(--ui-color-hex-d6dfed); padding: var(--ui-size-64px) var(--ui-size-32px); box-shadow: 0 8px 32px var(--ui-color-rgba-30-50-90-05); }
+#drop { border-color: var(--ui-color-hex-b9c9e2); }
+@media (max-width: 1100px) and (min-width: 901px) { #panel { width: 360px; } }
+/* 左で設定し、右で仕上がりを見ながら進める */
+#sc { gap: var(--space-3); padding: var(--space-3); background: var(--workspace-bg); }
+#panel { order: -1; width: 340px; border: 1px solid var(--line); border-radius: var(--radius-large); overflow: hidden; }
+.scatter-heading, .plot-heading { display: flex; padding: var(--space-4); gap: var(--space-1); }
+.scatter-heading, .plot-heading > div { flex-direction: column; }
+.scatter-heading b, .plot-heading b { font-size: var(--text-body); }
+.scatter-heading span, .plot-heading span { color: var(--muted); font-size: var(--text-small); }
+#tabs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); padding: var(--space-2); border-top: 1px solid var(--line); }
+#tabs button { white-space: normal; }
+#tab_body { padding: var(--space-4); }
+#left { flex: 1; background: transparent; border: 1px solid var(--line); border-radius: var(--radius-large); padding: 0 var(--space-4) var(--space-6); }
+.plot-heading { align-items: center; justify-content: space-between; padding: var(--space-4) 0; }
+.plot-heading > div { display: flex; gap: var(--space-1); }
+.empty-state, #plot_wrap, #warns, #below, #data_box, .soon-note { max-width: none; }
+@media (max-width: 1100px) and (min-width: 901px) { #panel { width: 300px; } }
+@media (max-width: 900px) { #sc { flex-direction: column; } #panel { order: -1; width: auto; flex: none; } #tabs { grid-template-columns: repeat(4,1fr); } #left { flex: none; } }
+@media (min-width: 761px) and (max-width: 900px) {
+  #sc { flex-direction: row; overflow: hidden; }
+  #panel { width: 280px; }
+  #tabs { grid-template-columns: 1fr 1fr; }
+  #tab_body, #left { overflow-y: auto; }
+  #left { flex: 1; }
+}

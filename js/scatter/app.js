@@ -74,7 +74,7 @@ function draw(page, series, warns, info) {
     results.push({ s, r, x0, x1 });
   }
   if (st.fit && results.length < series.length && series.length) info.push("点が 3 個未満の系列(または x がすべて同じ系列)は、回帰直線を引いていません");
-  if (!series.length) info.push("右の「データ」で、縦軸 (y) の列を 1 つ以上選んでください");
+  if (!series.length) info.push("「データ」の欄で、縦軸 (y) の列を 1 つ以上選んでください");
   const { prims } = buildPlot({
     ...FIG, series, fits, xlabel: st.xlabel ?? autoXLabel(series), ylabel: st.ylabel ?? autoYLabel(series),
     title: st.title, legend: series.length > 1, grid: st.grid, sci: st.sci,

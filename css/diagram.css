@@ -34,3 +34,38 @@ svg#svg { display: block; user-select: none; }
 #side { padding: var(--space-4); }
 #side .empty { font-size: var(--size-14px); line-height: 1.6; }
 .tool.on { background: var(--accent-soft); }
+/* 道具・作業領域・設定をはっきり分ける */
+#top { min-height: 48px; background: var(--ui-color-hex-f5f7fb); padding: var(--ui-size-8px) var(--ui-size-12px); }
+#palette { width: 88px; padding: var(--ui-size-12px) var(--ui-size-8px); background: var(--ui-color-hex-e9eef7); }
+.ptitle { color: var(--ui-color-hex-65748d); font-size: var(--ui-size-12px); margin: var(--ui-size-12px) var(--ui-size-4px) var(--ui-size-8px); }
+.tool { font-size: var(--ui-size-12px); padding: var(--ui-size-8px) var(--ui-size-4px); border-radius: var(--ui-size-8px); }
+.tool.on { background: var(--ui-color-hex-fff); color: var(--ui-color-hex-274f9e); box-shadow: 0 2px 8px var(--ui-color-rgba-30-50-90-1); }
+#side { width: 260px; background: var(--ui-color-hex-fff); padding: var(--ui-size-24px) var(--ui-size-16px); }
+#hint { padding: var(--ui-size-8px) var(--ui-size-16px); background: var(--ui-color-hex-edf1f8); }
+/* 作業面を中心に、道具と設定を独立した欄として並べる */
+#app { background: var(--workspace-bg); }
+#top { display: flex; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--surface); }
+.editing-actions, .view-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); }
+#main { padding: var(--space-3); gap: var(--space-3); overflow: hidden; }
+.tool-panel, .properties-panel, .canvas-panel { min-height: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-large); overflow: hidden; display: flex; flex-direction: column; }
+.tool-panel { width: 160px; flex: none; }
+.properties-panel { width: 280px; flex: none; }
+.panel-heading, .canvas-heading { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line); }
+.panel-heading b, .canvas-heading b { font-size: var(--text-ui); }
+.panel-heading span, .canvas-heading span { color: var(--muted); font-size: var(--text-small); }
+.canvas-heading { flex-direction: row; align-items: baseline; gap: var(--space-3); }
+.canvas-panel { flex: 1; min-width: 0; }
+#palette { width: auto; flex: 1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; gap: var(--space-1); padding: var(--space-2); background: var(--surface); border: 0; }
+#palette .ptitle, #palette .gates { grid-column: 1 / -1; }
+#palette .ptitle { margin: var(--space-2) var(--space-1) var(--space-1); }
+#palette .gates { gap: var(--space-1); }
+#palette .tool { margin: 0; min-height: 48px; }
+#palette > .tool:first-child { grid-column: 1 / -1; flex-direction: row; justify-content: center; }
+#wrap { min-height: 0; }
+#side { width: auto; flex: 1; border: 0; padding: var(--space-4); }
+#hint { border: 0; margin: 0 var(--space-3) var(--space-2); border-radius: var(--radius); }
+@media (max-width: 1100px) { .tool-panel { width: 144px; } .properties-panel { width: 240px; } #top { flex-wrap: wrap; } }
+@media (max-width: 700px) { #main { gap: var(--space-2); padding: var(--space-2); } .tool-panel { width: 80px; } #palette { display: block; } #palette .tool { margin-bottom: var(--space-1); } .properties-panel { width: 200px; } .panel-heading span, .canvas-heading span { display: none; } }
+#palette .tool { min-height: 64px; }
+#palette .tool svg { flex: none; }
+#palette > .tool:first-child { min-height: 48px; }

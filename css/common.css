@@ -1,5 +1,6 @@
 /* どのページでも使う見た目 */
 :root {
+  --workspace-bg: #eef2f8; --nav-text: #d7e2f7; --nav-soft: rgba(255,255,255,.1); --nav-hover: rgba(255,255,255,.12);
   --accent: #315fa9; --accent-hover: #244d8f; --accent-soft: #eaf1fc;
   --line: #dce2e8; --muted: #536273; --bg: #f5f7f9; --ink: #1c2b3a;
   --danger: #b43e3e; --surface: #fff; --surface-soft: #eef3f8;
@@ -97,6 +98,64 @@
   --size-10-5px: 10.5px;
   --size-9-5px: 9.5px;
   --size-40px: 40px;
+
+  /* 新しい画面で使う色と寸法 */
+  --ui-color-hex-fff: #fff;
+  --ui-color-hex-dce3ee: #dce3ee;
+  --ui-color-hex-243755: #243755;
+  --ui-color-hex-edf1f8: #edf1f8;
+  --ui-color-hex-284b98: #284b98;
+  --ui-color-rgba-28-45-80-1: rgba(28,45,80,.1);
+  --ui-color-hex-ccd6e5: #ccd6e5;
+  --ui-color-hex-355cb2: #355cb2;
+  --ui-color-rgba-24-39-68-16: rgba(24,39,68,.16);
+  --ui-color-hex-f5f7fb: #f5f7fb;
+  --ui-color-hex-e9eef7: #e9eef7;
+  --ui-color-hex-65748d: #65748d;
+  --ui-color-hex-274f9e: #274f9e;
+  --ui-color-rgba-30-50-90-1: rgba(30,50,90,.1);
+  --ui-color-hex-eef2f8: #eef2f8;
+  --ui-color-hex-f6f8fc: #f6f8fc;
+  --ui-color-hex-d6dfed: #d6dfed;
+  --ui-color-rgba-30-50-90-05: rgba(30,50,90,.05);
+  --ui-color-hex-b9c9e2: #b9c9e2;
+  --ui-color-hex-f6f7fb: #f6f7fb;
+  --ui-color-hex-182744: #182744;
+  --ui-color-hex-dfe5f0: #dfe5f0;
+  --ui-color-rgba-30-50-90-06: rgba(30,50,90,.06);
+  --ui-color-hex-4b5b75: #4b5b75;
+  --ui-color-hex-e9eef9: #e9eef9;
+  --ui-color-hex-243d75: #243d75;
+  --ui-color-hex-385eaf: #385eaf;
+  --ui-color-hex-000: #000;
+  --ui-color-hex-666: #666;
+  --ui-color-hex-516078: #516078;
+  --ui-color-hex-64738b: #64738b;
+  --ui-color-hex-dbe2ef: #dbe2ef;
+  --ui-color-rgba-30-50-90-12: rgba(30,50,90,.12);
+  --ui-color-hex-697994: #697994;
+  --ui-color-hex-c3cddd: #c3cddd;
+  --ui-color-hex-66758d: #66758d;
+  --ui-color-hex-263958: #263958;
+  --ui-color-hex-27488f: #27488f;
+  --ui-color-hex-dfe5ef: #dfe5ef;
+  --ui-color-rgba-30-50-90-04: rgba(30,50,90,.04);
+  --ui-color-hex-f4f7fc: #f4f7fc;
+  --ui-color-hex-1c2d50: #1c2d50;
+  --ui-size-8px: 8px;
+  --ui-size-16px: 16px;
+  --ui-size-4px: 4px;
+  --ui-size-12px: 12px;
+  --ui-size-24px: 24px;
+  --ui-size-64px: 64px;
+  --ui-size-32px: 32px;
+  --ui-size-14px: 14px;
+  --ui-size-48px: 48px;
+  --ui-size-30px: 30px;
+  --ui-size-80px: 80px;
+  --ui-size-20px: 20px;
+  --ui-size-96px: 96px;
+  --ui-size-36px: 36px;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -226,3 +285,28 @@ dialog.wide { width: min(860px, 94vw); max-width: min(860px, 94vw); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
 
 #d_pick { min-width: 130px; }
+/* 作業画面に共通する見た目 */
+:root { --accent: #355cb2; --accent-hover: #27488f; --accent-soft: #e9effc; --ink: #182744; --muted: #56657d; --line: #dce3ee; --bg: #f2f5fa; }
+#bar { min-height: 56px; padding: var(--ui-size-8px) var(--ui-size-16px); background: var(--ui-color-hex-fff); border-bottom: 1px solid var(--ui-color-hex-dce3ee); }
+#bar .brand { color: var(--ui-color-hex-243755); }
+#bar .apps { background: var(--ui-color-hex-edf1f8); border-radius: var(--ui-size-8px); padding: var(--ui-size-4px); }
+#bar .apps a { padding: var(--ui-size-8px) var(--ui-size-12px); }
+#bar .apps a.on { color: var(--ui-color-hex-284b98); box-shadow: 0 2px 8px var(--ui-color-rgba-28-45-80-1); }
+.btn { border-color: var(--ui-color-hex-ccd6e5); border-radius: var(--ui-size-8px); }
+.btn.primary { background: var(--ui-color-hex-355cb2); border-color: var(--ui-color-hex-355cb2); }
+.pop, dialog { border-color: var(--ui-color-hex-dce3ee); box-shadow: 0 16px 48px var(--ui-color-rgba-24-39-68-16); }
+/* ファイル操作とページ移動を別の行にまとめる */
+#bar { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0; background: var(--surface); }
+.bar-navigation, .bar-document { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); min-width: 0; }
+.bar-navigation { background: var(--ink); color: var(--surface); }
+#bar .bar-navigation .brand { color: var(--surface); margin-right: var(--space-3); }
+#bar .bar-navigation .brand:hover { background: var(--nav-hover); }
+#bar .bar-navigation .apps { background: var(--nav-soft); }
+#bar .bar-navigation .apps a { color: var(--nav-text); padding: var(--space-2) var(--space-3); }
+#bar .bar-navigation .apps a.on { background: var(--surface); color: var(--accent); }
+#bar .bar-navigation .apps a:hover:not(.on) { color: var(--surface); background: var(--nav-hover); }
+.bar-document { flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+#bar .doc { margin-left: 0; }
+#bar .bar-document .sp { min-width: 0; }
+@media (max-width: 1100px) { #bar .bar-navigation .brand span { display: inline; } }
+@media (max-width: 700px) { .bar-navigation, .bar-document { padding: var(--space-2); } #bar .bar-navigation .brand span { display: none; } }
