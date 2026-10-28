@@ -254,7 +254,8 @@ function nearShape(p, exclude) {   // p を含む図形、なければ輪郭の�
   return best;
 }
 function endpointAt(p, exclude) { // マウスの位置にある図形につなぐ(なければ自由な点)
-  const s = S.doc.snapEdge ? nearShape(p, exclude) : shapeAt(p, exclude);
+  if (!S.doc.snapEdge) return snapP(p);
+  const s = nearShape(p, exclude);
   if (!s) return snapP(p);
   if (s.type === "dot") return { id: s.id, ax: 0.5, ay: 0.5 };
   if (s.type === "gate") {        // 論理ゲートは、いちばん近い端子につなぐ
@@ -1205,7 +1206,7 @@ svg.addEventListener("mousedown", ev => {
   } else if (t === "elbow") {
     if (!S.draft) { S.histPushed = false; S.draft = { from: startPoint(p), pts: [] }; }
     else {
-      const s = nearShape(p);
+      const s = S.doc.snapEdge ? nearShape(p) : null;
       if (s && !S.draft.pts.length && s.id === S.draft.from.id) { /* 始点の図形をもう一度クリック → 何もしない */ }
       else if (s) finishElbow(endpointAt(p));
       else { const pts = draftPts(); S.draft.pts.push(pts[pts.length - 1]); }
