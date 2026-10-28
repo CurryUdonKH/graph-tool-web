@@ -32,7 +32,7 @@ const DEF = {
   poly:    { w: 120, h: 120, text: "", fontSize: 22, lw: 2, fill: "#ffffff", sides: 6 },
   note:    { w: 240, h: 80, text: "注釈", fontSize: 18, lw: 1, fill: "#ffffff" },
   text:    { w: 120, h: 40, text: "文字", fontSize: 18, lw: 1, fill: "none" },
-  gate:    { w: 120, h: 80, text: "", fontSize: 16, lw: 2, fill: "#ffffff" },
+  gate:    { w: 120, h: 80, text: "", fontSize: 16, lw: 1.5, fill: "#ffffff" },
   dot:     { w: 10, h: 10, text: "", fontSize: 12, lw: 1, fill: "#000000" },
 };
 const W = 1600, H = 1000;
