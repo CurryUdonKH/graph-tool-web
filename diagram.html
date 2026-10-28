@@ -64,7 +64,8 @@
     </div>
     <div class="view-actions" aria-label="表示設定">
     <label class="chk" title="方眼を表示する"><input type="checkbox" id="g_show">グリッド</label>
-    <label class="chk" title="図形や線の端を、グリッドや図形の輪郭に吸い付ける"><input type="checkbox" id="g_snap">吸着</label>
+    <label class="chk" title="図形や線をグリッドに合わせる"><input type="checkbox" id="g_snap">グリッドに吸着</label>
+    <label class="chk" title="図形の辺・中心や線の端を、近くの図形の縁に合わせる"><input type="checkbox" id="g_edge_snap">図形の縁に吸着</label>
     <select id="g_size" title="グリッドの間隔"><option value="10">10</option><option value="20">20</option><option value="40">40</option></select>
     <div class="sep"></div>
     <button class="ib" id="z_out" title="縮小(− キー)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg></button>
@@ -81,6 +82,25 @@
   <div id="hint"></div>
 </div>
 
+<dialog id="format_dialog" class="format-dialog" aria-labelledby="format_title">
+  <h3 id="format_title">文字の書式</h3>
+  <p>文字を選んで、書式を設定します。数式は <code>$...$</code> のまま入力できます。</p>
+  <label for="format_text">文字</label><textarea id="format_text" rows="4"></textarea>
+  <div class="format-controls" aria-label="文字の書式">
+    <button type="button" class="btn" data-format="bold" title="太字"><b>太字</b></button>
+    <button type="button" class="btn" data-format="italic" title="斜体">斜体</button>
+    <button type="button" class="btn" data-format="underline" title="下線">下線</button>
+    <button type="button" class="btn" data-format="strike" title="取り消し線">取り消し線</button>
+    <label>色 <input type="color" id="format_color" value="#000000"></label>
+    <label>大きさ <input type="number" id="format_size" min="6" max="96" value="22"> pt</label>
+    <label>位置 <select id="format_script"><option value="normal">通常</option><option value="super">上付き</option><option value="sub">下付き</option></select></label>
+    <button type="button" class="btn" data-format="clear">書式を解除</button>
+  </div>
+  <p class="format-message" id="format_message" aria-live="polite"></p>
+  <div class="format-preview-label">見本</div><div id="format_preview" class="format-preview"></div>
+  <p class="format-note">数式の一部を選んだ場合、書式は数式全体に適用します。見本は入力した記号で表示し、図と書き出しでは数式として描きます。</p>
+  <div class="acts"><button type="button" class="btn" id="format_cancel">やめる</button><button type="button" class="btn primary" id="format_save">適用する</button></div>
+</dialog>
 <dialog id="dlg"><h3 id="dlg_t"></h3><div id="dlg_b"></div><div class="acts" id="dlg_a"></div></dialog>
 <div id="toast"></div>
 <div id="busy">書き出しの準備をしています…</div>

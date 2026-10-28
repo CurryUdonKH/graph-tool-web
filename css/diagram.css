@@ -69,3 +69,18 @@ svg#svg { display: block; user-select: none; }
 #palette .tool { min-height: 64px; }
 #palette .tool svg { flex: none; }
 #palette > .tool:first-child { min-height: 48px; }
+
+.format-dialog { width: min(640px, 94vw); max-width: min(640px, 94vw); }
+.format-dialog > label { display: block; font-weight: 600; margin-bottom: var(--space-2); }
+#format_text { display: block; width: 100%; min-height: 100px; resize: vertical; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius); font: inherit; line-height: 1.5; }
+.format-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
+.format-controls label { display: inline-flex; align-items: center; gap: var(--space-1); }
+.format-controls input[type=color] { width: 36px; height: 30px; padding: 2px; }
+.format-controls input[type=number] { width: 62px; }
+.format-message, .format-note { color: var(--muted); font-size: 12px; }
+.format-dialog .format-message { margin: var(--space-2) 0; min-height: 20px; }
+.format-preview-label { font-weight: 600; margin-bottom: var(--space-2); }
+.format-preview { min-height: 64px; border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-3); background: white; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 18px; }
+.format-dialog .format-note { margin-top: var(--space-2); }
+
+.format-controls button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }

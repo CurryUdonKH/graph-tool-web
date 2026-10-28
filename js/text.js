@@ -111,7 +111,8 @@ function textWidth(t, size, key) {
 //   va = "center" → 縦の真ん中が y = 0、"top" → 上端が y = 0、"bottom" → 下端が y = 0
 // 返り値 { runs: [{kind: "text"|"math", x, y(ベースライン), ...}], box: {x, y, w, h}, errors: [] }
 // fontKey は FONTS の名前(省略でゴシック体)
-export function layout(s, size, ha, va, fontKey = "gothic") {
+export function layout(s, size, ha, va, fontKey = "gothic", styles = null) {
+  if (Array.isArray(styles) && styles.some(Boolean)) return richLayout(String(s), size, ha, va, fontKey, styles);
   if (!FONTS[fontKey]) fontKey = "gothic";
   if (!loadedFonts[fontKey]) loadFont(fontKey);
   const key = `${fontKey}|${size}|${ha}|${va}|${s}`;
@@ -157,27 +158,103 @@ export function layout(s, size, ha, va, fontKey = "gothic") {
   return out;
 }
 
+// 部分書式付きの文字。保存位置は JavaScript の文字列と同じ UTF-16 の位置。
+function richLayout(s, size, ha, va, fontKey, styles) {
+  if (!FONTS[fontKey]) fontKey = "gothic";
+  if (!loadedFonts[fontKey]) loadFont(fontKey);
+  const errors = [], lines = []; let offset = 0;
+  for (const line of s.split("\n")) {
+    const runs = []; let x = 0, asc = ASC * size, desc = DESC * size, i = 0, dollars = 0;
+    for (let j = 0; j < line.length; j++) { if (line[j] === "\\" && line[j + 1] === "$") { j++; continue; } if (line[j] === "$") dollars++; }
+    const allowMath = dollars % 2 === 0;
+    while (i < line.length) {
+      const st = styles[offset + i] || {}, rs = Number(st.size) > 0 ? Math.min(96, Math.max(6, Number(st.size))) : size;
+      const script = st.script === "super" ? "super" : st.script === "sub" ? "sub" : "normal";
+      const drawSize = script === "normal" ? rs : rs * 0.72;
+      const shift = script === "super" ? -rs * 0.38 : script === "sub" ? rs * 0.22 : 0;
+      let end = i + (line.codePointAt(i) > 0xffff ? 2 : 1), math = false, tex = "", escaped = false;
+      if (line[i] === "\\" && line[i + 1] === "$") { end = i + 2; escaped = true; }
+      if (!escaped && allowMath && line[i] === "$" && (i === 0 || line[i - 1] !== "\\")) {
+        let j = i + 1; while (j < line.length && (line[j] !== "$" || line[j - 1] === "\\")) j++;
+        if (j < line.length) { end = j + 1; tex = line.slice(i + 1, j); math = true; }
+      }
+      if (!math && !escaped) {
+        const sig = JSON.stringify(st);
+        while (end < line.length && line[end] !== "$" && !(line[end] === "\\" && line[end + 1] === "$") && JSON.stringify(styles[offset + end] || {}) === sig)
+          end += line.codePointAt(end) > 0xffff ? 2 : 1;
+      }
+      const t = escaped ? "$" : line.slice(i, end), color = /^#[0-9a-f]{6}$/i.test(st.color || "") ? st.color : null;
+      const common = { x, size: drawSize, color, bold: !!st.bold, italic: !!st.italic, underline: !!st.underline, strike: !!st.strike, shift };
+      if (math) {
+        if (!mathReady) loadMath();
+        const m = mathReady ? mathSvg(tex) : null;
+        if (m && !m.err) {
+          const k = drawSize * MATH_SCALE / 1000, [vx, vy, vw, vh] = m.vb;
+          runs.push({ ...common, kind: "math", k, vx, w: vw * k, body: m.body }); x += vw * k;
+          asc = Math.max(asc, -vy * k - shift + 0.1 * drawSize); desc = Math.max(desc, (vh + vy) * k + shift + 0.1 * drawSize);
+        } else {
+          if (m && m.err) errors.push({ tex, msg: m.err });
+          const w = textWidth(t, drawSize, fontKey); runs.push({ ...common, kind: "text", t, w, bad: !!m?.err }); x += w;
+        }
+      } else {
+        const w = textWidth(t, drawSize, fontKey); runs.push({ ...common, kind: "text", t, w }); x += w;
+      }
+      asc = Math.max(asc, drawSize - shift); desc = Math.max(desc, drawSize * DESC + shift);
+      i = end;
+    }
+    lines.push({ runs, w: x, asc, desc }); offset += line.length + 1;
+  }
+  const totalH = lines.reduce((a, l) => a + l.asc + l.desc, 0), maxW = Math.max(0, ...lines.map(l => l.w));
+  const top = va === "top" ? 0 : va === "bottom" ? -totalH : -totalH / 2;
+  const left = w => ha === "left" ? 0 : ha === "right" ? -w : -w / 2;
+  let y = top; const runs = [];
+  for (const l of lines) {
+    const base = y + l.asc, x0 = left(l.w);
+    for (const r of l.runs) runs.push({ ...r, x: x0 + r.x, y: base + r.shift });
+    y += l.asc + l.desc;
+  }
+  const pad = runs.some(r => r.italic || r.bold) ? Math.max(size, ...runs.map(r => r.size || size)) * .25 : 0;
+  return { runs, size, fontKey, errors, box: { x: left(maxW) - pad, y: top, w: maxW + 2 * pad, h: totalH } };
+}
+
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const f1 = v => Math.round(v * 100) / 100;
 
 // 画面用の SVG(文字は <text>)。x, y は layout() の基準点。rot は (x, y) を中心に回す角度(度)
+function decoration(r, x, y, color, size) {
+  if (!r.w) return "";
+  const parts = [];
+  if (r.underline) parts.push(y + size * 0.1);
+  if (r.strike) parts.push(y - size * 0.3);
+  return parts.map(yy => `<path d="M${f1(x)} ${f1(yy)}h${f1(r.w)}" stroke="${color}" stroke-width="${f1(Math.max(1, size * .055))}"/>`).join("");
+}
 export function textMarkup(L, x, y, color = "#000", rot = 0) {
   let h = "";
   for (const r of L.runs) {
-    if (r.kind === "math") h += `<g transform="translate(${f1(x + r.x - r.vx * r.k)} ${f1(y + r.y)}) scale(${r.k})">${r.body.replace(/currentColor/g, color)}</g>`;
-    else h += `<text x="${f1(x + r.x)}" y="${f1(y + r.y)}" font-size="${L.size}" font-family="${FONTS[L.fontKey].family}, 'Hiragino Sans', sans-serif" fill="${r.bad ? "#c62828" : color}" xml:space="preserve">${esc(r.t)}</text>`;
+    const c = r.color || color, size = r.size || L.size, xx = x + r.x, yy = y + r.y;
+    if (r.kind === "math") {
+      const skew = r.italic ? " skewX(-12)" : "";
+      h += `<g transform="translate(${f1(xx - r.vx * r.k)} ${f1(yy)})${skew} scale(${r.k})"${r.bold ? ` stroke="${c}" stroke-width="${f1(size * .045 / r.k)}" paint-order="stroke fill"` : ""}>${r.body.replace(/currentColor/g, c)}</g>`;
+      h += decoration(r, xx, yy, c, size);
+    } else {
+      h += `<text x="${f1(xx)}" y="${f1(yy)}" font-size="${size}" font-family="${FONTS[L.fontKey].family}, 'Hiragino Sans', sans-serif" fill="${r.bad ? "#c62828" : c}"${r.bold ? ` stroke="${c}" stroke-width="${f1(size * .045)}" paint-order="stroke fill"` : ""}${r.italic ? ` transform="translate(${f1(xx)} ${f1(yy)}) skewX(-12) translate(${-f1(xx)} ${-f1(yy)})"` : ""} xml:space="preserve">${esc(r.t)}</text>`;
+      h += decoration(r, xx, yy, c, size);
+    }
   }
   return rot ? `<g transform="rotate(${rot} ${f1(x)} ${f1(y)})">${h}</g>` : h;
 }
-
-// 書き出し用の SVG(文字は輪郭の線)。先に await ready() しておくこと
 export function textOutlineMarkup(L, x, y, color = "#000", rot = 0) {
   let h = "";
   for (const r of L.runs) {
-    if (r.kind === "math") h += `<g transform="translate(${f1(x + r.x - r.vx * r.k)} ${f1(y + r.y)}) scale(${r.k})">${r.body.replace(/currentColor/g, color)}</g>`;
-    else {
-      const d = loadedFonts[L.fontKey].getPath(r.t, x + r.x, y + r.y, L.size).toPathData(2);
-      if (d) h += `<path d="${d}" fill="${color}"/>`;
+    const c = r.color || color, size = r.size || L.size, xx = x + r.x, yy = y + r.y;
+    if (r.kind === "math") {
+      const skew = r.italic ? " skewX(-12)" : "";
+      h += `<g transform="translate(${f1(xx - r.vx * r.k)} ${f1(yy)})${skew} scale(${r.k})"${r.bold ? ` stroke="${c}" stroke-width="${f1(size * .045 / r.k)}" paint-order="stroke fill"` : ""}>${r.body.replace(/currentColor/g, c)}</g>`;
+      h += decoration(r, xx, yy, c, size);
+    } else {
+      const d = loadedFonts[L.fontKey].getPath(r.t, xx, yy, size).toPathData(2);
+      if (d) h += `<path d="${d}" fill="${c}"${r.bold ? ` stroke="${c}" stroke-width="${f1(size * .045)}" paint-order="stroke fill"` : ""}${r.italic ? ` transform="translate(${f1(xx)} ${f1(yy)}) skewX(-12) translate(${-f1(xx)} ${-f1(yy)})"` : ""}/>`;
+      h += decoration(r, xx, yy, c, size);
     }
   }
   return rot ? `<g transform="rotate(${rot} ${f1(x)} ${f1(y)})">${h}</g>` : h;

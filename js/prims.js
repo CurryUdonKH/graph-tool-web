@@ -30,7 +30,7 @@ export function pathPoints(cmds) {
 
 // 文字が占める四角の 4 つの角(回転も考える)
 function textCorners(p) {
-  const b = layout(p.s, p.size, p.ha, p.va, p.font).box;
+  const b = layout(p.s, p.size, p.ha, p.va, p.font, p.styles).box;
   const pts = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]];
   const a = (p.rot || 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
   return pts.map(([x, y]) => ({ x: p.x + x * c - y * s, y: p.y + x * s + y * c }));
@@ -55,7 +55,7 @@ export function primsMarkup(prims, outline = false) {
   let h = "";
   for (const p of prims) {
     if (p.k === "text") {
-      const L = layout(p.s, p.size, p.ha, p.va, p.font);
+      const L = layout(p.s, p.size, p.ha, p.va, p.font, p.styles);
       h += (outline ? textOutlineMarkup : textMarkup)(L, p.x, p.y, p.color || "#000", p.rot || 0);
       continue;
     }

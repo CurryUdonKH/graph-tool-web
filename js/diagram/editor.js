@@ -1,3 +1,5 @@
+import { snapToGuides } from "./snap.mjs";
+import { remapStyles } from "./textstyles.mjs";
 // 図の作成エディタ(ブラウザ版)
 // 楕円・四角・注釈・文字と、直線/曲線/直角の矢印、論理ゲート・配線・接続点をマウスで置く。
 // 手元版(Streamlit のカスタムコンポーネント)の描画・操作をそのまま使い、
@@ -40,7 +42,7 @@ const S = {
 };
 try { S.zoom = Math.min(4, Math.max(0.25, +localStorage.getItem("diagram_zoom") || 1)); } catch (e) {}
 const px = v => v / S.zoom;   // 画面上で同じ大きさに見えるように(つまみ・当たり判定など)
-function newDoc() { return { grid: 20, snap: true, showGrid: true, W, H, items: [], nextId: 1 }; }
+function newDoc() { return { grid: 20, snap: true, snapEdge: true, showGrid: true, W, H, items: [], nextId: 1 }; }
 const WIRE_LW = 2;   // 配線の太さ(論理ゲートの線と同じ)
 function wireLw(...ends) {   // つながるゲートと同じ太さ。ゲートがなければ標準の太さ
   for (const end of ends) { const sh = end && end.id != null ? get(end.id) : null; if (sh && sh.type === "gate") return sh.lw; }
@@ -50,6 +52,7 @@ function fixDoc() {
   const d = S.doc;
   d.W = d.W || W; d.H = d.H || H; d.grid = d.grid || 20;
   if (d.snap === undefined) d.snap = true;
+  if (d.snapEdge === undefined) d.snapEdge = true;
   if (d.showGrid === undefined) d.showGrid = true;
   d.items = d.items || [];
   d.nextId = Math.max(d.nextId || 1, ...d.items.map(i => i.id + 1), 1);
@@ -251,7 +254,7 @@ function nearShape(p, exclude) {   // p を含む図形、なければ輪郭の�
   return best;
 }
 function endpointAt(p, exclude) { // マウスの位置にある図形につなぐ(なければ自由な点)
-  const s = nearShape(p, exclude);
+  const s = S.doc.snapEdge ? nearShape(p, exclude) : shapeAt(p, exclude);
   if (!s) return snapP(p);
   if (s.type === "dot") return { id: s.id, ax: 0.5, ay: 0.5 };
   if (s.type === "gate") {        // 論理ゲートは、いちばん近い端子につなぐ
@@ -288,7 +291,7 @@ function endpointAt(p, exclude) { // マウスの位置にある図形につな�
 }
 function labelGap(e, n) { // 線から文字の枠までが 6px あくような、文字の中心までの距離
   if (!e.label) return 14;
-  const b = layout(e.label, e.fontSize, "center", "center").box;
+  const b = layout(e.label, e.fontSize, "center", "center", "gothic", e.textStyles).box;
   return 6 + Math.abs(n.x) * b.w / 2 + Math.abs(n.y) * b.h / 2;
 }
 function defaultMid(e, a, b) {   // まだ動かしていない曲線の真ん中の点
@@ -559,7 +562,7 @@ function buildPrims() {
       const cx = s.type === "gate" ? s.x + s.w * 0.47 : c.x;
       const x = al === "left" ? s.x + ix : al === "right" ? s.x + s.w - ix : cx;
       const y = va === "top" ? s.y + iy : va === "bottom" ? s.y + s.h - iy : c.y;
-      out.push({ k: "text", x, y, s: s.text, size: s.fontSize, ha: al, va: va === "middle" ? "center" : va, src: s.id });
+      out.push({ k: "text", x, y, s: s.text, size: s.fontSize, ha: al, va: va === "middle" ? "center" : va, styles: s.textStyles, src: s.id });
     }
   }
   for (const e of edges()) {
@@ -568,7 +571,7 @@ function buildPrims() {
     out.push({ k: "path", cmds: g.cmds, lw: e.lw, dash: !!e.dash });
     if (e.arrow !== "none") out.push(headPrim(e, g.end, g.endFrom));
     if (e.arrow === "both") out.push(headPrim(e, g.start, g.startFrom));
-    if (e.label) out.push({ k: "text", x: g.label.x, y: g.label.y, s: e.label, size: e.fontSize, ha: "center", va: "center", src: e.id });
+    if (e.label) out.push({ k: "text", x: g.label.x, y: g.label.y, s: e.label, size: e.fontSize, ha: "center", va: "center", styles: e.textStyles, src: e.id });
   }
   // 端子の位置での分岐点:くっついて重なった端子どうしも 1 本のつながりとして数え、3 つ以上つながっていれば ● を描く
   const key = q => `${Math.round(q.x)},${Math.round(q.y)}`, spots = new Map();
@@ -602,7 +605,7 @@ function el(tag, attrs, parent) {
 }
 const dStr = cmds => cmds.map(c => c[0] + c.slice(1).map(v => v.toFixed(1)).join(" ")).join(" ");
 function drawText(p, parent) {   // 文字と $...$ の数式(並べ方は text.js。書き出しも同じ並べ方)
-  const L = layout(p.s, p.size, p.ha, p.va);
+  const L = layout(p.s, p.size, p.ha, p.va, "gothic", p.styles);
   for (const er of L.errors) if (!S.mathErr.some(x => x.tex === er.tex)) S.mathErr.push(er);
   el("g", {}, parent).innerHTML = textMarkup(L, p.x, p.y);
 }
@@ -756,7 +759,7 @@ function distSeg(p, a, b) {
   return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
 }
 function labelBox(e, g) {
-  const b = layout(e.label, e.fontSize, "center", "center").box;
+  const b = layout(e.label, e.fontSize, "center", "center", "gothic", e.textStyles).box;
   return { x: g.label.x + b.x - 4, y: g.label.y + b.y - 2, w: b.w + 8, h: b.h + 4 };
 }
 function hitTest(p) {
@@ -1379,24 +1382,14 @@ function dragMoveInner(d, p) {
       let tx = snapV(s0.x + dx), ty = snapV(s0.y + dy);
       if (s0.type === "dot") { tx = snapV(s0.x + dx + s0.w / 2) - s0.w / 2; ty = snapV(s0.y + dy + s0.h / 2) - s0.h / 2; }
       if (s0.type === "gate") { const off = gatePinOffset(s0); ty = snapV(s0.y + dy + off) - off; }
-      // 吸着がオンのときはグリッドの位置にだけ動かす。グリッドの位置で他の図形の辺や中心とそろったら、目安のガイド線を出す
-      // 吸着がオフのときは、他の図形の辺や中心に近づくとそろえる
-      const raw = S.doc.snap ? { x: tx, y: ty } : { x: s0.x + dx, y: s0.y + dy };
-      const tol = S.doc.snap ? 0.5 : px(7);
-      let best = { x: tol, y: tol };
-      for (const o of shapes().filter(s => !sel.has(s.id))) {
-        for (const mine of [0, s0.w / 2, s0.w])                                   // 自分の 左・中心・右
-          for (const ox of [o.x, o.x + o.w / 2, o.x + o.w]) {                    // 相手の 左・中心・右
-            const dd = Math.abs(raw.x + mine - ox);
-            if (dd < best.x) { best.x = dd; if (!S.doc.snap) tx = ox - mine; S.guides[0] = { x1: ox, y1: 0, x2: ox, y2: S.vh || S.doc.H }; }
-          }
-        for (const mine of [0, s0.h / 2, s0.h])
-          for (const oy of [o.y, o.y + o.h / 2, o.y + o.h]) {
-            const dd = Math.abs(raw.y + mine - oy);
-            if (dd < best.y) { best.y = dd; if (!S.doc.snap) ty = oy - mine; S.guides[1] = { x1: 0, y1: oy, x2: S.vw || S.doc.W, y2: oy }; }
-          }
+      // 縁への吸着はグリッドと独立。近い縁や中心があれば優先する。
+      if (S.doc.snapEdge) {
+        const result = snapToGuides({ x: s0.x + dx, y: s0.y + dy }, { x: tx, y: ty }, s0,
+          shapes().filter(s => !sel.has(s.id)), px(7));
+        tx = result.x; ty = result.y;
+        if (result.guideX != null) S.guides.push({ x1: result.guideX, y1: 0, x2: result.guideX, y2: S.vh || S.doc.H });
+        if (result.guideY != null) S.guides.push({ x1: 0, y1: result.guideY, x2: S.vw || S.doc.W, y2: result.guideY });
       }
-      S.guides = S.guides.filter(Boolean);
       dx = tx - s0.x; dy = ty - s0.y;
     } else { dx = snapV(dx); dy = snapV(dy); }
     for (const id of sel) {
@@ -1469,7 +1462,7 @@ function dragMoveInner(d, p) {
       it[h.k] = { dx: q.x - base.x, dy: q.y - base.y };
     } else if (h.k === "wp") {
       const q = snapP(p), pts = it.points, old = pts[h.i];
-      const ns = S.doc.snap ? null : nearShape(p);   // 吸着がオンならグリッドだけ。オフなら図形の輪郭に乗せる
+      const ns = S.doc.snapEdge ? nearShape(p) : null;   // 輪郭の吸着はグリッドと別に切り替える
       if (ns && !shapeAt(p)) {
         const b = boundary(ns, p);
         if (Math.abs(b.x - p.x) < px(EDGE_BAND)) q.x = Math.round(b.x);
@@ -1625,7 +1618,7 @@ function closeEditor(save) {
   if (save && it) {
     const v = ta.value.replace(/\s+$/, "");
     const cur = isShape(it) ? it.text : it.label;
-    if (v !== cur) { pushHist(); if (isShape(it)) it.text = v; else it.label = v; commit(); return; }
+    if (v !== cur) { pushHist(); it.textStyles = remapStyles(cur || "", v, it.textStyles); if (isShape(it)) it.text = v; else it.label = v; commit(); return; }
   }
   render();
 }
@@ -1640,6 +1633,73 @@ $("edit").addEventListener("input", ev => {   // 改行したら入力欄を広�
   const lines = ta.value.split("\n").length, size = it.fontSize * S.zoom;
   ta.style.height = Math.max(parseFloat(ta.style.height), lines * size * 1.25 + 6) + "px";
 });
+
+// 文字の挿入・削除で書式の位置を動かし、変わっていない部分を保つ。
+
+function openFormatEditor(it) {
+  if (!it) return;
+  const dlg = $("format_dialog"), ta = $("format_text"), preview = $("format_preview"), message = $("format_message");
+  const oldText = (isShape(it) ? it.text : it.label) || "";
+  let previous = oldText, styles = Array.from({ length: oldText.length }, (_, i) => it.textStyles?.[i] || null), start = 0, end = oldText.length;
+  ta.value = oldText; message.textContent = "文字を選んでから、書式を選んでください。";
+  preview.style.fontSize = it.fontSize + "px";
+  function remember() {
+    start = ta.selectionStart; end = ta.selectionEnd;
+    const selected = styles.slice(start, end), first = selected[0] || {};
+    dlg.querySelectorAll("[data-format]").forEach(b => {
+      if (b.dataset.format !== "clear") b.setAttribute("aria-pressed", String(selected.length > 0 && selected.every(st => !!st?.[b.dataset.format])));
+    });
+    $("format_color").value = first.color || "#000000";
+    $("format_size").value = first.size || it.fontSize;
+    $("format_script").value = first.script || "normal";
+  }
+  function drawPreview() {
+    preview.replaceChildren();
+    for (let i = 0; i < ta.value.length;) {
+      const cp = ta.value.codePointAt(i), ch = String.fromCodePoint(cp), st = styles[i] || {}, n = document.createElement("span");
+      n.textContent = ch; n.style.color = st.color || "#000000"; n.style.fontWeight = st.bold ? "bold" : "normal";
+      n.style.fontStyle = st.italic ? "italic" : "normal"; n.style.textDecoration = [st.underline ? "underline" : "", st.strike ? "line-through" : ""].filter(Boolean).join(" ");
+      if (st.size) n.style.fontSize = st.size + "px";
+      if (st.script === "super" || st.script === "sub") { n.style.verticalAlign = st.script === "super" ? "super" : "sub"; n.style.fontSize = (st.size || it.fontSize) * .72 + "px"; }
+      preview.appendChild(n); i += ch.length;
+    }
+  }
+  function apply(key, value) {
+    if (start === end) { message.textContent = "先に、書式を変えたい文字を選んでください。"; ta.focus(); return; }
+    // 数式はひとまとまりとして描くため、数式の一部を選んだ場合も数式全体に適用する。
+    let open = -1;
+    for (let i = 0; i < ta.value.length; i++) {
+      if (ta.value[i] === "\\") { i++; continue; }
+      if (ta.value[i] !== "$") continue;
+      if (open < 0) open = i;
+      else { if (start < i + 1 && end > open) { start = Math.min(start, open); end = Math.max(end, i + 1); } open = -1; }
+    }
+    const selected = styles.slice(start, end), toggle = value === "toggle" ? !selected.every(s => s?.[key]) : value;
+    for (let i = start; i < end; i++) {
+      if (key === "clear") styles[i] = null;
+      else { const obj = { ...(styles[i] || {}) }; if (toggle === null || toggle === false || toggle === "normal") delete obj[key]; else obj[key] = toggle; styles[i] = Object.keys(obj).length ? obj : null; }
+    }
+    message.textContent = "選んだ文字に書式を設定しました。数式は全体に適用されます。"; drawPreview(); ta.focus(); ta.setSelectionRange(start, end); remember();
+  }
+  ta.onselect = ta.onkeyup = ta.onmouseup = remember;
+  ta.oninput = () => { styles = remapStyles(previous, ta.value, styles); if (styles.length !== ta.value.length) styles = Array.from({ length: ta.value.length }, (_, i) => styles[i] || null); previous = ta.value; remember(); drawPreview(); };
+  dlg.querySelectorAll("[data-format]").forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => apply(b.dataset.format, b.dataset.format === "clear" ? null : "toggle"); });
+  $("format_color").onchange = e => apply("color", e.target.value);
+  $("format_size").onchange = e => { const n = Number(e.target.value); if (n >= 6 && n <= 96) apply("size", n); else message.textContent = "文字の大きさは 6〜96 で指定してください。"; };
+  $("format_script").onchange = e => apply("script", e.target.value);
+  $("format_cancel").onclick = () => dlg.close();
+  $("format_save").onclick = () => {
+    const value = ta.value.replace(/\s+$/, ""); styles = styles.slice(0, value.length);
+    const savedStyles = styles.some(Boolean) ? styles : [];
+    const originalStyles = Array.isArray(it.textStyles) && it.textStyles.some(Boolean) ? it.textStyles : [];
+    if (value !== oldText || JSON.stringify(savedStyles) !== JSON.stringify(originalStyles)) {
+      pushHist(); if (isShape(it)) it.text = value; else it.label = value;
+      it.textStyles = savedStyles; commit();
+    }
+    dlg.close();
+  };
+  drawPreview(); dlg.showModal(); ta.focus(); ta.setSelectionRange(0, oldText.length); remember();
+}
 
 // ------------------------------------------------------------------ キーボード・ボタン
 function delSel() {
@@ -1782,6 +1842,7 @@ function buildToolbar() {
 
   $("g_show").onchange = e => { S.doc.showGrid = e.target.checked; commit(); };
   $("g_snap").onchange = e => { S.doc.snap = e.target.checked; commit(); };
+  $("g_edge_snap").onchange = e => { S.doc.snapEdge = e.target.checked; commit(); };
   $("g_size").onchange = e => { S.doc.grid = +e.target.value; commit(); };
   $("b_undo").onclick = undo; $("b_redo").onclick = redo;
   $("b_dup").onclick = () => { copySel(); paste(); };
@@ -1857,7 +1918,7 @@ function sideHTML(items) {
   const same = k => items.every(i => i[k] === one[k]) ? one[k] : "";
   const kinds = [...new Set(items.map(i => i.type))].map(t => KIND_NAME[t]).join("・");
   let h = `<div class="sec"><h4>${items.length === 1 ? kinds : `${items.length} 個を選択中(${kinds})`}</h4>`;
-  if (items.length === 1) h += `<button class="btn wide" id="p_text">✏️ 文字を編集</button>`;
+  if (items.length === 1) h += `<button class="btn wide" id="p_text">✏️ 文字を編集</button><button class="btn wide" id="p_format" style="margin-top:8px">文字の書式を設定</button>`;
   h += `</div>`;
   if (shapesSel.length) {
     const al = shapesSel.every(i => textAlign(i)[0] === textAlign(shapesSel[0])[0]) ? textAlign(shapesSel[0])[0] : "";
@@ -2004,6 +2065,8 @@ function bindSide() {
   on("fs_minus", "click", () => fs(-2)); on("fs_plus", "click", () => fs(2));
   on("p_fs", "change", e => { const v = +e.target.value; if (v >= 6) set(i => i.fontSize = v); });
   on("p_text", "click", () => openEditor(items[0]));
+  on("p_format", "pointerdown", e => { if (S.editing != null) e.preventDefault(); });
+  on("p_format", "click", () => { if (S.editing != null) closeEditor(true); openFormatEditor(items[0]); });
   on("p_inset", "input", e => { items.forEach(i => { if (i.type === "trap") i.inset = +e.target.value; }); render(); });
   on("p_inset", "pointerdown", () => pushHist());
   on("p_inset", "change", () => commit());
@@ -2047,7 +2110,7 @@ let lastPropsKey = "";
 function updateUI() {
   document.querySelectorAll("#palette .tool").forEach(b => b.classList.toggle("on",
     b.dataset.tool === S.tool && (S.tool !== "gate" || b.dataset.gate === S.gateKind)));
-  $("g_show").checked = S.doc.showGrid; $("g_snap").checked = S.doc.snap; $("g_size").value = String(S.doc.grid);
+  $("g_show").checked = S.doc.showGrid; $("g_snap").checked = S.doc.snap; $("g_edge_snap").checked = S.doc.snapEdge; $("g_size").value = String(S.doc.grid);
   $("b_undo").disabled = !S.hist.length; $("b_redo").disabled = !S.fut.length;
   $("b_dup").disabled = $("b_del").disabled = !S.sel.length;
   $("zpct").textContent = Math.round(S.zoom * 100) + "%";
