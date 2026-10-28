@@ -43,11 +43,7 @@ const S = {
 try { S.zoom = Math.min(4, Math.max(0.25, +localStorage.getItem("diagram_zoom") || 1)); } catch (e) {}
 const px = v => v / S.zoom;   // 画面上で同じ大きさに見えるように(つまみ・当たり判定など)
 function newDoc() { return { grid: 20, snap: true, snapEdge: true, showGrid: true, W, H, items: [], nextId: 1 }; }
-const WIRE_LW = 2;   // 配線の太さ(論理ゲートの線と同じ)
-function wireLw(...ends) {   // つながるゲートと同じ太さ。ゲートがなければ標準の太さ
-  for (const end of ends) { const sh = end && end.id != null ? get(end.id) : null; if (sh && sh.type === "gate") return sh.lw; }
-  return WIRE_LW;
-}
+const LINE_LW = 1.5;   // 新しく作る線の標準の太さ
 function fixDoc() {
   const d = S.doc;
   d.W = d.W || W; d.H = d.H || H; d.grid = d.grid || 20;
@@ -929,7 +925,8 @@ function restructureWires() {
         if (e.from.id === d.id) e.from = { x: c.x, y: c.y }; if (e.to.id === d.id) e.to = { x: c.x, y: c.y };
         removeItem(d); changed = true; break;
       }
-      if (es.length === 2 && es.every(e => isWire(e) && !(e.points && e.points.length))) {
+      if (es.length === 2 && es.every(e => isWire(e) && !(e.points && e.points.length)) &&
+          es[0].lw === es[1].lw && !!es[0].dash === !!es[1].dash) {
         const far = e => e.from.id === d.id ? e.to : e.from, o1 = refPt(far(es[0])), o2 = refPt(far(es[1]));
         const vert = Math.abs(o1.x - c.x) < 0.5 && Math.abs(o2.x - c.x) < 0.5 && (o1.y - c.y) * (o2.y - c.y) < 0;
         const horiz = Math.abs(o1.y - c.y) < 0.5 && Math.abs(o2.y - c.y) < 0.5 && (o1.x - c.x) * (o2.x - c.x) < 0;
@@ -1122,7 +1119,7 @@ function finishWire(tg) {
   const corners = d.pts.length ? [...d.pts, ...route(last, T, null, endDir(to))] : routeWire(d.from, to, start, T);
   if (to.id == null && d.from.id == null && dist(start, T) < 1) { render(); return; }
   const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from: d.from, to, points: simplify(start, corners, T),
-              label: "", fontSize: 18, lw: wireLw(d.from, to), arrow: "none", dash: false, wire: true };
+              label: "", fontSize: 18, lw: LINE_LW, arrow: "none", dash: false, wire: true };
   S.doc.items.push(e);
   S.sel = [e.id]; S.tool = "select";
   commit(); updateCursor();
@@ -1546,14 +1543,14 @@ function createEdge(from, to, start, p) {
   if (dist(start, p) < 10) { if (S.histPushed) { S.histPushed = false; undo(); S.fut.pop(); } else render(); return; }   // クリックしただけ(分岐も取り消す)
   if (!S.histPushed) pushHist();
   S.histPushed = false;
-  const e = { id: S.doc.nextId++, type: "edge", style: S.tool, from, to, label: "", fontSize: 18, lw: 1.5, arrow: "end", dash: false, ...lastHead() };
+  const e = { id: S.doc.nextId++, type: "edge", style: S.tool, from, to, label: "", fontSize: 18, lw: LINE_LW, arrow: "end", dash: false, ...lastHead() };
   if (S.tool === "curve") e.bend = 40;
   if (from.id != null && from.id === to.id) makeLoop(e);
   // 論理ゲートや接続点につながる配線は、矢印なしの縦横の線にする(斜めにしない)
   if ([from, to].some(x => x.id != null && ["gate", "dot"].includes(get(x.id)?.type))) {
     e.arrow = "none";
     if (e.style === "straight") { e.style = "elbow"; e.points = routeWire(from, to); }
-    e.wire = true; e.lw = wireLw(from, to);
+    e.wire = true; e.lw = LINE_LW;
   }
   // 注釈から引く線は、細い線にする(参考図の「ここを設計」のような指し示し)
   const src = from.id != null ? get(from.id) : null;
@@ -1585,7 +1582,7 @@ function finishElbow(to) {
   if (!S.histPushed) pushHist();
   S.histPushed = false;
   const wire = [d.from, to].some(x => x.id != null && ["gate", "dot"].includes(get(x.id)?.type));
-  const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from: d.from, to, points: simplify(refPt(d.from), pts, refPt(to)), label: "", fontSize: 18, lw: wire ? wireLw(d.from, to) : 1.5, arrow: wire ? "none" : "end", dash: false, wire, ...(wire ? {} : lastHead()) };
+  const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from: d.from, to, points: simplify(refPt(d.from), pts, refPt(to)), label: "", fontSize: 18, lw: LINE_LW, arrow: wire ? "none" : "end", dash: false, wire, ...(wire ? {} : lastHead()) };
   S.doc.items.push(e);
   S.sel = [e.id]; S.tool = "select";   // 置いたら選択に戻る
   commit(); updateCursor();
@@ -2250,7 +2247,6 @@ const clone = o => JSON.parse(JSON.stringify(o));
 // 開いた図を、今の形にそろえる(前の形の配線・ゲートを直し、つながりを整える)
 function tidyLoaded() {
   fixDoc();
-  for (const e of edges()) if (isWire(e) && e.lw === 1.5) e.lw = WIRE_LW;   // 前の標準の太さ(1.5)の配線をゲートにそろえる
   detachWireEnds(); autoAttach(); normalizeWires(true); restructureWires();
 }
 
