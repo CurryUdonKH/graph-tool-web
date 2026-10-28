@@ -1,4 +1,5 @@
 import { snapToGuides } from "./snap.mjs";
+import { isWire, migrateWireTypes } from "./wiretypes.mjs";
 import { remapStyles } from "./textstyles.mjs";
 // 図の作成エディタ(ブラウザ版)
 // 楕円・四角・注釈・文字と、直線/曲線/直角の矢印、論理ゲート・配線・接続点をマウスで置く。
@@ -51,6 +52,7 @@ function fixDoc() {
   if (d.snapEdge === undefined) d.snapEdge = true;
   if (d.showGrid === undefined) d.showGrid = true;
   d.items = d.items || [];
+  migrateWireTypes(d.items);
   d.nextId = Math.max(d.nextId || 1, ...d.items.map(i => i.id + 1), 1);
   // 前の形の D-FF(端子が高さの 3/8・5/8)を、小さい形(1/3・2/3、80×120)にする。真ん中の位置は保つ
   for (const s of d.items) {
@@ -703,7 +705,7 @@ function drawOverlay() {
     if (tg.wire) { el("circle", { cx: tg.pt.x, cy: tg.pt.y, r: px(11), fill: "none", stroke: "#1baf7a", "stroke-width": px(2) });
                    el("circle", { cx: tg.pt.x, cy: tg.pt.y, r: px(5), fill: "#1baf7a" }); }
   }
-  if (!S.drag && !S.wdraft && !S.draft && ["wire", "straight", "elbow"].includes(S.tool)) {   // ここから分岐できる、の目印
+  if (!S.drag && !S.wdraft && !S.draft && S.tool === "wire") {   // ここから分岐できる、の目印
     const w = wireAt(S.mouse), pin = S.tool === "wire" && !w ? pinAt(S.mouse) : null;
     if (pin) { const q = refPt(pin); el("circle", { cx: q.x, cy: q.y, r: px(8), fill: "none", stroke: "#1baf7a", "stroke-width": px(2.5) }); }
     if (w) {
@@ -802,6 +804,7 @@ function detachWireEnds() {   // 配線の端が文字・四角・楕円など�
 }
 function autoAttach() {   // 見た目でつながっている端(● の中心・ゲートの端子にぴったり)を、本当につなぐ
   for (const e of edges()) {
+    if (!isWire(e)) continue;
     for (const k of ["from", "to"]) {
       const end = e[k];
       if (end.id != null) continue;
@@ -949,7 +952,6 @@ const ptOf = ev => { const r = svg.getBoundingClientRect(); return { x: (ev.clie
 // ---- 配線:途中からの分岐と、縦横の自動ルート
 // 配線かどうか:「配線」で引いた線と、ゲートや接続点につながった矢印なしの直角線
 // 配線かどうか:「配線」で引いた線と、矢印のない直線・直角線(曲線や矢印つきの線は図形の縁につなぐ「矢印」扱い)
-const isWire = e => !!e && e.type === "edge" && (e.wire === true || ((e.style === "elbow" || e.style === "straight") && e.arrow === "none"));
 function pinAt(p) {    // 「配線」の道具でつなげる所:論理ゲートの端子と接続点だけ(四角や楕円の縁には吸い付かない)
   let best = null, bd = px(12);
   for (const s of shapes()) {
@@ -969,7 +971,7 @@ function wireAt(p) {   // p のすぐ近くを通る配線(直線・直角線)�
   const ns = S.tool === "wire" ? pinAt(p) : (shapeAt(p) || shapes().find(o => dist(p, boundary(o, p)) < px(6)));
   if (ns) return null;                          // 端子(図形)のすぐそばでは、そちらを優先
   let best = null;
-  for (const e of edges().filter(edgeOk)) {
+  for (const e of edges().filter(e => isWire(e) && edgeOk(e))) {
     if (e.style === "curve") continue;
     const pts = edgeGeom(e).pts;
     for (let i = 0; i < pts.length - 1; i++) {
@@ -1013,9 +1015,11 @@ function splitWire(hit) {   // 配線を hit.q で 2 本に分け、そこに接
   return at;
 }
 function startPoint(p) {    // 線の始点:配線の途中(分岐)> 図形(端子)> 自由な点(図形のすぐそばでは図形が優先)
-  const w = wireAt(p);
-  if (w) { if (!S.histPushed) pushHist(); S.histPushed = true; return splitWire(w); }
-  if (S.tool === "wire") return pinAt(p) || snapP(p);   // 配線:端子・接続点、なければグリッドの点
+  if (S.tool === "wire") {
+    const w = wireAt(p);
+    if (w) { if (!S.histPushed) pushHist(); S.histPushed = true; return splitWire(w); }
+    return pinAt(p) || snapP(p);
+  }   // 配線:端子・接続点、なければグリッドの点
   return endpointAt(p);
 }
 function endDir(end) {      // 端が横向きに出入りするか(true)、縦か(false)。決まっていなければ null
@@ -1546,12 +1550,7 @@ function createEdge(from, to, start, p) {
   const e = { id: S.doc.nextId++, type: "edge", style: S.tool, from, to, label: "", fontSize: 18, lw: LINE_LW, arrow: "end", dash: false, ...lastHead() };
   if (S.tool === "curve") e.bend = 40;
   if (from.id != null && from.id === to.id) makeLoop(e);
-  // 論理ゲートや接続点につながる配線は、矢印なしの縦横の線にする(斜めにしない)
-  if ([from, to].some(x => x.id != null && ["gate", "dot"].includes(get(x.id)?.type))) {
-    e.arrow = "none";
-    if (e.style === "straight") { e.style = "elbow"; e.points = routeWire(from, to); }
-    e.wire = true; e.lw = LINE_LW;
-  }
+  e.wire = false;   // 「直線」「曲線」は、接続先や矢印の有無にかかわらず通常の線
   // 注釈から引く線は、細い線にする(参考図の「ここを設計」のような指し示し)
   const src = from.id != null ? get(from.id) : null;
   if (src && src.type === "note") e.lw = 1;
@@ -1581,8 +1580,7 @@ function finishElbow(to) {
   if (to.id == null && d.from.id == null && !pts.length) { render(); return; }
   if (!S.histPushed) pushHist();
   S.histPushed = false;
-  const wire = [d.from, to].some(x => x.id != null && ["gate", "dot"].includes(get(x.id)?.type));
-  const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from: d.from, to, points: simplify(refPt(d.from), pts, refPt(to)), label: "", fontSize: 18, lw: LINE_LW, arrow: wire ? "none" : "end", dash: false, wire, ...(wire ? {} : lastHead()) };
+  const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from: d.from, to, points: simplify(refPt(d.from), pts, refPt(to)), label: "", fontSize: 18, lw: LINE_LW, arrow: "end", dash: false, wire: false, ...lastHead() };
   S.doc.items.push(e);
   S.sel = [e.id]; S.tool = "select";   // 置いたら選択に戻る
   commit(); updateCursor();
@@ -1914,7 +1912,7 @@ function sideHTML(items) {
     くわしくは右上の「？ → 数式の書き方」</div>`;
   const one = items[0], shapesSel = items.filter(isShape), edgesSel = items.filter(i => !isShape(i));
   const same = k => items.every(i => i[k] === one[k]) ? one[k] : "";
-  const kinds = [...new Set(items.map(i => i.type))].map(t => KIND_NAME[t]).join("・");
+  const kinds = [...new Set(items.map(i => isWire(i) ? "配線" : KIND_NAME[i.type]))].join("・");
   let h = `<div class="sec"><h4>${items.length === 1 ? kinds : `${items.length} 個を選択中(${kinds})`}</h4>`;
   if (items.length === 1) h += `<button class="btn wide" id="p_text">✏️ 文字を編集</button><button class="btn wide" id="p_format" style="margin-top:8px">文字の書式を設定</button>`;
   h += `</div>`;
@@ -1948,7 +1946,7 @@ function sideHTML(items) {
       h += `<div class="sec"><h4>ゲートの種類</h4><select id="p_gate" style="width:100%">${Object.entries(GATE_NAMES).map(([v, l]) => `<option value="${v}" ${v === one.kind ? "selected" : ""}>${l}</option>`).join("")}</select></div>`
          + (["not", "buf", "dff"].includes(one.kind) ? "" : `<div class="sec"><h4>入力の数</h4><div class="stepper"><button id="nin_minus" title="入力を 1 本減らす">−</button><input type="number" id="p_nin" min="2" max="8" value="${gateIns(one)}"><button id="nin_plus" title="入力を 1 本増やす">＋</button></div></div>`);
   }
-  if (edgesSel.length) {
+  if (edgesSel.length && !edgesSel.some(isWire)) {
     const arrows = edgesSel.every(e => e.arrow === edgesSel[0].arrow) ? edgesSel[0].arrow : "";
     h += `<div class="sec"><h4>矢印</h4>${seg("arrow", [["none", sicon("arrowNone"), "矢印なし"], ["end", sicon("arrowEnd"), "終点に矢印"], ["both", sicon("arrowBoth"), "両端に矢印"]], arrows)}`;
     const heads = edgesSel.filter(e => e.arrow !== "none");
@@ -1959,13 +1957,11 @@ function sideHTML(items) {
     h += `</div>`;
     if (edgesSel.length === 1) {
       h += `<div class="sec"><h4>線の形</h4>${seg("style", [["straight", sicon("straight"), "直線"], ["curve", sicon("curve"), "曲線"], ["elbow", sicon("elbow"), "直角"]], one.style)}</div>`;
-      if (one.style !== "curve")
-        h += `<div class="sec"><button class="btn wide" id="p_branch" title="「配線」の道具に切り替えます">⑂ この線から分岐する</button>
-          <div style="font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.6">押したあと、線の上にマウスを持っていくと<b style="color:#1baf7a">緑の輪</b>が出ます。そこをクリック → 行き先をクリックで分岐します。</div></div>`;
       h += `<div class="sec grid2"><button class="btn" id="p_reverse" title="矢印の向きを反対にします">⇄ 向きを反転</button>`
          + (one.style === "curve" ? `<button class="btn" id="p_curvereset" title="曲がり方を最初の形に戻します">↺ 曲がりを戻す</button>` : `<span></span>`) + `</div>`;
     }
   }
+  if (edgesSel.length === 1 && isWire(edgesSel[0])) h += `<div class="sec"><button class="btn wide" id="p_branch">⑂ この配線から分岐する</button></div>`;
   if (shapesSel.length >= 2) {
     h += `<div class="sec"><h4>整列</h4><div class="grid3">
       ${["left", "hcenter", "right", "top", "vcenter", "bottom"].map(k => `<button class="btn" data-align="${k}" title="${{ left: "左をそろえる", hcenter: "左右の中心をそろえる", right: "右をそろえる", top: "上をそろえる", vcenter: "上下の中心をそろえる", bottom: "下をそろえる" }[k]}">${aicon(k)}</button>`).join("")}
@@ -2049,7 +2045,7 @@ function bindSide() {
     else if (k === "align") set(i => { if (isShape(i)) i.align = v; });
     else if (k === "valign") set(i => { if (isShape(i)) i.valign = v; });
     else if (k === "fill") set(i => { if (isShape(i)) i.fill = v; });
-    else if (k === "arrow") set(i => { if (!isShape(i)) { i.arrow = v; if (v !== "none") delete i.wire; } });
+    else if (k === "arrow") set(i => { if (!isShape(i) && !isWire(i)) i.arrow = v; });
     else if (k === "style") set(i => {
       if (isShape(i) || i.style === v) return;
       i.style = v;
