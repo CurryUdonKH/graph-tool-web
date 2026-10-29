@@ -29,17 +29,17 @@
     <div class="pop" id="p_file">
       <button class="item" id="f_new">＋ 新しいグラフ</button>
       <div class="sepline"></div>
-      <button class="item" id="m_backup">⬇ バックアップを書き出す<br><small>保存した図・グラフを 1 つのファイルにまとめて保存</small></button>
+      <button class="item" id="m_backup">バックアップを書き出す<br><small>保存した図・グラフを 1 つのファイルにまとめて保存</small></button>
       <button class="item" id="m_restore">⬆ バックアップを読み込む<br><small>書き出したファイルから戻す</small></button>
       <input type="file" id="f_backup" accept="application/json,.json" hidden>
       <div class="sepline"></div>
       <button class="item danger" id="d_delete">🗑 このグラフを削除</button>
     </div>
   </div>
-  <button class="btn primary" id="d_export" title="画面のグラフをそのまま書き出します。形式と保存先は、次の画面で選べます">⬇ 書き出す</button>
+  <button class="btn primary" id="d_export" title="画面のグラフをそのまま書き出します。形式と保存先は、次の画面で選べます">書き出す</button>
   <div class="popwrap"><button class="btn icon" id="d_more" title="使い方・数式の書き方・保存について" aria-label="ヘルプ">？</button>
     <div class="pop" id="p_more">
-      <a class="item" href="help.html" target="_blank" rel="noopener">📖 使い方(別のタブで開く)</a>
+      <a class="item" href="help.html" target="_blank" rel="noopener">使い方(別のタブで開く)</a>
       <button class="item" id="m_math">∑ 数式の書き方(上付き・下付き・ギリシャ文字)</button>
       <button class="item" id="m_about">ⓘ 保存について</button>
     </div>
@@ -49,7 +49,7 @@
 <main id="sc">
   <aside id="panel">
     <div class="scatter-heading"><b>グラフの設定</b><span>データを選び、表示を調整</span></div>
-    <nav id="tabs">
+    <nav id="tabs" aria-label="グラフ設定の分類">
       <button data-tab="data" class="on">データ</button>
       <button data-tab="fit">回帰直線</button>
       <button data-tab="label">ラベル・数式</button>
@@ -59,18 +59,18 @@
   </aside>
   <section id="left">
     <div class="plot-heading"><div><b>グラフ</b><span>読み込んだデータの仕上がり</span></div><span class="plot-format">PDF・PNG・SVG に書き出し</span></div>
-    <div class="soon-note">🧪 散布図は<b>ベータ版</b>(試作版)です。使えますが、これから見た目や動きが変わることがあります。</div>
+    <div class="soon-note"><b>ベータ版</b><span>散布図は試作版です。今後、見た目や動きが変わることがあります。</span></div>
     <div id="empty" class="empty-state" hidden>
-      <div class="big">📁</div>
+      <div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 10h18"/></svg></div>
       <p><b>Excel / CSV を読み込んでください</b></p>
       <p class="sub">「データ」の欄か、このページのどこかにファイルをドラッグしても読み込めます。<br>読み込むとグラフができて、自動で保存されます。</p>
       <button class="btn primary" id="empty_pick">ファイルを選ぶ</button>
     </div>
-    <div id="plot_wrap"><svg id="plot" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div id="plot_stage"><div id="plot_wrap"><svg id="plot" xmlns="http://www.w3.org/2000/svg"></svg></div><aside id="result_summary" aria-label="回帰結果の要約" hidden></aside></div>
     <div id="warns"></div>
     <div id="below"></div>
     <details id="data_box" hidden>
-      <summary>📋 データを見る・直す <span id="data_sum"></span></summary>
+      <summary>データを見る・直す <span id="data_sum"></span></summary>
       <div id="data_tabs"></div>
       <div id="data_table"></div>
     </details>

@@ -1788,7 +1788,9 @@ document.addEventListener("keydown", ev => {
   }
 });
 
-function setTool(t) { if (S.histPushed) { S.histPushed = false; S.wdraft = null; S.draft = null; undo(); S.fut.pop(); } S.tool = t; S.draft = null; S.wdraft = null; render(); updateCursor(); }
+function setTool(t) {
+  if (t !== "select") setToolCategory(t === "gate" ? "gate" : ["wire", "straight", "curve", "elbow"].includes(t) ? "line" : "shape");
+  if (S.histPushed) { S.histPushed = false; S.wdraft = null; S.draft = null; undo(); S.fut.pop(); } S.tool = t; S.draft = null; S.wdraft = null; render(); updateCursor(); }
 const ICON = {
   select: '<path d="M6 3l12 9-5.5 1L15 19l-2.5 1.2-2.6-6L6 17z" fill="currentColor"/>',
   ellipse: '<ellipse cx="13" cy="11" rx="10" ry="7" fill="none" stroke="currentColor" stroke-width="1.8"/>',
@@ -1814,6 +1816,10 @@ function gateIcon(kind) {   // 実際の形(gatePrims)を小さく描いたア�
   return svgIcon(body, "0 0 60 40");
 }
 const TOOL_LABEL = { select: "選択", ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", straight: "直線", curve: "曲線", elbow: "直角線", dot: "接続点", wire: "配線" };
+function setToolCategory(category) {
+  document.querySelectorAll("#palette [data-group]").forEach(el => { el.hidden = el.dataset.group !== category; });
+  document.querySelectorAll(".tool-categories button").forEach(el => el.setAttribute("aria-pressed", String(el.dataset.category === category)));
+}
 function buildToolbar() {
   const pal = $("palette");
   const btn = (tool, label, icon, extra) => {
@@ -1825,16 +1831,14 @@ function buildToolbar() {
     b.onclick = () => { if (extra) S.gateKind = extra; setTool(tool); };
     return b;
   };
-  const title = t => { const d = document.createElement("div"); d.className = "ptitle"; d.textContent = t; pal.appendChild(d); };
   pal.appendChild(btn("select", "選択", svgIcon(ICON.select)));
-  title("図形");
-  for (const t of ["ellipse", "rect", "trap", "poly", "note", "text"]) pal.appendChild(btn(t, TOOL_LABEL[t], svgIcon(ICON[t])));
-  title("線・矢印");
+  for (const t of ["ellipse", "rect", "trap", "poly", "note", "text"]) { const b = btn(t, TOOL_LABEL[t], svgIcon(ICON[t])); b.dataset.group = "shape"; pal.appendChild(b); }
   // 接続点(●)は、配線の途中から分岐すると自動でできるので、道具の欄には出さない
-  for (const t of ["wire", "straight", "curve", "elbow"]) pal.appendChild(btn(t, TOOL_LABEL[t], svgIcon(ICON[t])));
-  title("論理ゲート");
-  const g = document.createElement("div"); g.className = "gates"; pal.appendChild(g);
+  for (const t of ["wire", "straight", "curve", "elbow"]) { const b = btn(t, TOOL_LABEL[t], svgIcon(ICON[t])); b.dataset.group = "line"; pal.appendChild(b); }
+  const g = document.createElement("div"); g.className = "gates"; g.dataset.group = "gate"; pal.appendChild(g);
   for (const k of Object.keys(GATE_NAMES)) g.appendChild(btn("gate", k === "buf" ? "BUF" : GATE_NAMES[k], gateIcon(k), k));
+  document.querySelectorAll(".tool-categories button").forEach(b => b.onclick = () => setToolCategory(b.dataset.category));
+  setToolCategory("shape");
 
   $("g_show").onchange = e => { S.doc.showGrid = e.target.checked; commit(); };
   $("g_snap").onchange = e => { S.doc.snap = e.target.checked; commit(); };
@@ -1896,25 +1900,27 @@ function sideHTML(items) {
   if (items.length && items.every(i => i.type === "dot")) return dotsHTML(items);
   if (!items.length) return underlayHTML() + `<div class="empty">
     <b>使い方</b><br>
-    ① 左から道具を選んで、画面をクリック<br>
-    ② 線は図形から図形へドラッグ<br>
-    ③ 図形や線を選ぶと、ここで設定できます<br><br>
-    <b>便利な操作</b><br>
+    <ol class="getting-started">
+      <li>道具を選んで図を置く</li>
+      <li>線で図形をつなぐ</li>
+      <li>図形や線を選んで設定する</li>
+    </ol>
+    <details class="side-help"><summary>便利な操作</summary>
     ダブルクリック … 文字を編集<br>
     <span class="kbd">⌘</span>+<span class="kbd">Z</span> 戻す ・ <span class="kbd">⌘</span>+<span class="kbd">D</span> 複製<br>
     <span class="kbd">Delete</span> 削除 ・ 矢印キー 少し動かす<br>
     <span class="kbd">スペース</span>+ドラッグ 画面を動かす<br>
     <span class="kbd">⌘</span>+スクロール / ピンチ 拡大縮小<br>
-    <span class="kbd">Shift</span>+クリック 複数を選ぶ<br><br>
-    <b>数式</b><br>
+    <span class="kbd">Shift</span>+クリック 複数を選ぶ</details>
+    <details class="side-help"><summary>数式</summary>
     文字の中の <code>$...$</code> は数式になります。<br>
     例:<code>$\\alpha$</code>、<code>$x_1$</code>、<code>$10^{-3}$</code><br>
-    くわしくは右上の「？ → 数式の書き方」</div>`;
+    くわしくは右上の「？ → 数式の書き方」</details></div>`;
   const one = items[0], shapesSel = items.filter(isShape), edgesSel = items.filter(i => !isShape(i));
   const same = k => items.every(i => i[k] === one[k]) ? one[k] : "";
   const kinds = [...new Set(items.map(i => isWire(i) ? "配線" : KIND_NAME[i.type]))].join("・");
   let h = `<div class="sec"><h4>${items.length === 1 ? kinds : `${items.length} 個を選択中(${kinds})`}</h4>`;
-  if (items.length === 1) h += `<button class="btn wide" id="p_text">✏️ 文字を編集</button><button class="btn wide" id="p_format" style="margin-top:8px">文字の書式を設定</button>`;
+  if (items.length === 1) h += `<button class="btn wide" id="p_text">文字を編集</button><button class="btn wide" id="p_format" style="margin-top:8px">文字の書式を設定</button>`;
   h += `</div>`;
   if (shapesSel.length) {
     const al = shapesSel.every(i => textAlign(i)[0] === textAlign(shapesSel[0])[0]) ? textAlign(shapesSel[0])[0] : "";

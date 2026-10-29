@@ -22,7 +22,7 @@
 .tbl { border-collapse: collapse; background: var(--color-hex-fff); font-size: var(--size-12-5px); font-variant-numeric: tabular-nums; }
 .tbl th, .tbl td { border: 1px solid var(--line); padding: var(--size-4px) var(--size-8px); text-align: right; white-space: nowrap; }
 .tbl th { background: var(--color-hex-f1f1ee); font-weight: 600; color: var(--color-hex-444); }
-.tbl td: first-child, .tbl th:first-child { text-align: left; }
+.tbl td:first-child, .tbl th:first-child { text-align: left; }
 .scroll { overflow-x: auto; }
 .cap { color: var(--muted); font-size: var(--size-12px); line-height: 1.6; margin-top: var(--size-6px); }
 
@@ -44,7 +44,7 @@
 #data_table td.bad { background: var(--color-hex-fdecec); }
 #data_table td.rn { color: var(--muted); background: var(--color-hex-fafaf8); text-align: right; }
 #data_table .del { border: none; background: none; color: var(--muted); cursor: pointer; padding: 0 var(--size-4px); }
-#data_table .del: hover { color: var(--danger); }
+#data_table .del:hover { color: var(--danger); }
 /* 元のファイル(範囲を選ぶ) */
 .rawbar { background: var(--color-hex-f7f7f5); border: 1px solid var(--line); border-radius: var(--size-8px); padding: var(--size-8px) var(--size-10px); margin-bottom: var(--size-8px); line-height: 1.6; }
 .rawbar .row { gap: var(--size-8px); }
@@ -52,7 +52,7 @@
 .rawgrid { user-select: none; }
 .rawgrid td { text-align: left; color: var(--color-hex-333); min-width: 56px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; cursor: cell; }
 .rawgrid th.ch { cursor: pointer; text-align: center; }
-.rawgrid th.ch: hover { background: var(--accent-soft); color: var(--accent); }
+.rawgrid th.ch:hover { background: var(--accent-soft); color: var(--accent); }
 .rawgrid td.used { background: var(--color-hex-eaf7f0); }
 .rawgrid td.head { font-weight: 700; }
 .rawgrid td.sel { background: var(--color-hex-d6e6fa); box-shadow: inset 0 0 0 1px var(--color-hex-9cc0ee); }
@@ -72,7 +72,7 @@
 .warn { color: var(--danger); font-size: var(--size-12px); margin-top: var(--size-4px); }
 .tip-box { background: var(--color-hex-eef5fd); border-radius: var(--size-8px); padding: var(--size-8px) var(--size-10px); font-size: var(--size-12px); line-height: 1.8; margin: var(--size-4px) 0 var(--size-10px); }
 #drop { border: 2px dashed var(--color-hex-c9c9c3); border-radius: var(--size-10px); padding: var(--size-16px); text-align: center; color: var(--muted); margin-bottom: var(--size-14px); cursor: pointer; line-height: 1.7; }
-#drop: hover, #drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+#drop:hover, #drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 #drop b { color: var(--ink); }
 details.gear { margin-bottom: var(--size-8px); }
 details.gear summary { cursor: pointer; font-size: var(--size-12px); color: var(--muted); }
@@ -127,3 +127,133 @@ details.gear > div { padding: var(--size-8px) 0 var(--size-2px); }
   #tab_body, #left { overflow-y: auto; }
   #left { flex: 1; }
 }
+
+/* グラフと結果を同じ画面で読みやすくする */
+#sc { gap: var(--space-2); padding: var(--space-2); }
+#panel { width: 304px; }
+.scatter-heading, .plot-heading { padding: var(--space-3) var(--space-4); }
+.scatter-heading { gap: var(--space-1); }
+.plot-heading { padding: var(--space-3) 0; }
+#tabs { gap: var(--space-1); background: var(--surface-soft); }
+#tabs button { min-height: 36px; padding: var(--space-2); font-size: var(--text-ui); }
+#tabs button.on { color: var(--accent); background: var(--surface); box-shadow: none; }
+#tab_body { padding: var(--space-3); }
+#left { padding: 0 var(--space-4) var(--space-5); background: var(--surface); }
+.soon-note { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2); background: var(--surface-soft); border-color: var(--line); color: var(--muted); padding: var(--space-2) var(--space-3); font-size: var(--text-small); }
+.soon-note b { color: var(--accent); white-space: nowrap; }
+.empty-state { border: 1px dashed #aebdc8; box-shadow: none; padding: var(--space-7) var(--space-5); }
+.empty-icon { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto var(--space-3); color: var(--accent); background: var(--accent-soft); border-radius: var(--radius); }
+.empty-icon svg { width: 24px; height: 24px; }
+#plot_wrap { display: flex; justify-content: center; padding: var(--space-2); }
+#plot { width: auto; max-width: 100%; max-height: 62vh; }
+#below { margin-top: var(--space-3); }
+#below h3 { font-size: var(--text-ui); flex-wrap: wrap; line-height: 1.5; }
+#below .tbl { font-size: var(--text-small); width: 100%; }
+#below .tbl th, #below .tbl td { padding: var(--space-2); }
+#data_box { margin-top: var(--space-3); }
+.card { padding: var(--space-3); margin-bottom: var(--space-3); }
+#drop { padding: var(--space-3); }
+@media (max-width: 1100px) and (min-width: 901px) { #panel { width: 300px; } }
+@media (max-width: 760px) { #panel { width: auto; } #plot { max-height: 60vh; } }
+
+/* 表示用の要約は、書き出し用の SVG には含めない */
+#plot_stage { display: grid; grid-template-columns: minmax(0, 1fr) 228px; gap: var(--space-2); align-items: start; }
+#plot_stage:has(#result_summary[hidden]) { grid-template-columns: minmax(0, 1fr); }
+#plot_wrap { min-width: 0; }
+#result_summary { display: flex; flex-direction: column; min-width: 0; max-height: 62vh; overflow: hidden; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-soft); color: var(--ink); }
+#result_summary h3 { margin: 0 0 var(--space-3); font-size: var(--text-ui); }
+#result_summary h4 { display: flex; gap: var(--space-2); align-items: baseline; min-width: 0; margin: 0 0 var(--space-1); font-size: var(--text-ui); }
+.result-series-name { display: -webkit-box; min-width: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+#result_summary .swatch { flex: none; }
+.result-scroll-note { margin: 0 0 var(--space-2); color: var(--muted); font-size: var(--text-small); }
+.result-summary-list { min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8da0ae transparent; }
+.result-series + .result-series { margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--line); }
+.result-series dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1) var(--space-2); margin: 0; font-size: var(--text-ui); line-height: 1.35; font-variant-numeric: tabular-nums; }
+.result-series dl div { display: flex; justify-content: space-between; min-width: 0; gap: var(--space-1); }
+.result-series dl div:last-child { grid-column: 1 / -1; }
+.result-series dt { color: var(--muted); white-space: nowrap; }
+.result-series dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+#result_summary a { display: inline-block; margin-top: var(--space-3); font-size: var(--text-small); color: var(--accent); }
+@media (max-width: 1100px) { #plot_stage { grid-template-columns: minmax(0, 1fr); } #result_summary { max-height: none; } .result-summary-list { overflow: visible; } .result-series dl { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); column-gap: var(--space-3); } }
+
+/* 読み込んだ列と選択状態を判別しやすくする */
+#tab_body .sub { font-size: var(--text-ui); line-height: 1.5; }
+#tab_body .card h4, #tab_body .fld2 > span, #tab_body details.gear summary { font-size: var(--text-ui); }
+#tab_body .fld2 small { display: block; font-size: var(--text-small); font-weight: 400; }
+#tab_body .checks label { min-height: 32px; padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius); font-size: var(--text-ui); }
+#tab_body .checks label:has(input:checked) { border-color: var(--line); background: var(--accent-soft); color: var(--ink); }
+#tab_body .checks label:hover { background: var(--surface-soft); }
+#tab_body .checks label:has(input:checked):hover { background: var(--accent-soft); }
+
+/* 複数の読み込みファイルを見渡せる一覧 */
+#drop { text-wrap: balance; }
+.file-card { padding: 0; }
+.file-card > summary { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: var(--space-2) var(--space-3); cursor: pointer; font-size: var(--text-ui); }
+.file-card > summary::before { content: "▸"; color: var(--muted); flex: none; }
+.file-card[open] > summary::before { content: "▾"; }
+.file-card > summary:hover { background: var(--surface-soft); }
+.file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.file-count { flex: none; color: var(--muted); font-size: var(--text-small); white-space: nowrap; }
+.file-settings { padding: 0 var(--space-3) var(--space-3); }
+#result_summary h3 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+#result_summary h3 span { color: var(--muted); font-size: var(--text-small); font-weight: 400; white-space: nowrap; }
+.result-series dl { line-height: 1.5; row-gap: var(--space-1); }
+
+/* タブ、ファイル、結果を作業面の中で軽く区切る */
+#tabs { gap: 0; padding: 0; background: var(--surface); }
+#tabs button { min-height: 36px; margin: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--muted); font-weight: 400; }
+#tabs button:nth-child(odd) { border-right: 1px solid var(--line); }
+#tabs button.on { background: var(--surface-soft); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 600; }
+#tabs button:hover:not(.on) { background: var(--surface-soft); }
+#drop { border-width: 1px; border-radius: 4px; }
+.file-card { border-radius: 4px; }
+.file-name { font-weight: 500; }
+#result_summary { border-radius: 4px; background: #f8fafb; }
+#result_summary h4 { font-weight: 600; }
+#tab_body .checks label { border-radius: 4px; }
+#tab_body .checks label:has(input:checked) { border-color: transparent; background: #eef3f6; }
+
+/* 共通設計: 操作、グラフ、結果を静かな作業面として整理 */
+#panel, #left { border-radius: 8px; }
+.scatter-heading, .plot-heading { padding-top: 12px; padding-bottom: 12px; }
+.scatter-heading b, .plot-heading b { font-size: 16px; font-weight: 600; }
+#tabs { background: var(--surface); }
+#tabs button { min-height: 40px; font-size: 14px; }
+#tabs button.on { background: transparent; color: var(--accent); box-shadow: inset 0 -2px var(--accent); }
+#drop { background: #f7f8f6; border: 1px dashed var(--line); padding: 12px; }
+.file-card { border-color: var(--line); border-radius: 4px; background: var(--surface); }
+.file-card > summary { min-height: 44px; }
+#result_summary { background: #f5f7f6; border-color: var(--line); border-radius: 4px; }
+#result_summary h3, #result_summary h4 { font-weight: 600; }
+#tabs button:hover:not(.on) { background: var(--surface-soft); }
+#tab_body .checks label:has(input:checked), #tab_body .checks label:has(input:checked):hover { background: var(--accent-soft); }
+.soon-note { background: var(--surface-soft); border-color: var(--line); }
+@media (min-width: 1101px) { #result_summary { max-height: 64vh; } }
+
+/* 設定と作業面を段組みにし、グラフの外側の枠を重ねない */
+#sc { gap: 0; padding: 0; background: var(--surface); }
+#panel { border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--surface-soft); }
+#tabs, #tabs button { background: transparent; }
+#tabs button.on { background: var(--surface); }
+#left { border: 0; border-radius: 0; background: var(--surface); }
+#plot_wrap { border: 0; border-radius: 0; padding: 8px 0; }
+#below { margin-top: 64px; }
+@media (max-width: 760px) { #panel { border-right: 0; border-bottom: 1px solid var(--line); } }
+@media (min-width: 1101px) {
+  #plot_stage { min-height: calc(100vh - 230px); }
+  #below { margin-top: 32px; }
+}
+/* ファイル読み込みはキーボードでも操作できるボタン */
+#drop { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px; border: 1px solid #cbd7d2; border-radius: 4px; background: var(--surface); color: var(--accent); text-align: left; font: inherit; }
+#drop svg { width: 24px; height: 24px; flex: none; }
+.drop-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.drop-copy strong { color: var(--ink); font-size: 14px; font-weight: 600; }
+.drop-copy span { color: var(--muted); font-size: 12px; line-height: 1.4; }
+#drop:hover, #drop.over { border-color: var(--accent); background: var(--accent-soft); }
+
+/* ファイルは枠の繰り返しではなく、区切りを共有する一覧 */
+.file-card { margin: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+.file-card > summary { min-height: 44px; padding: 8px 4px; line-height: 20px; }
+.file-card > summary:hover { background: var(--surface); }
+.file-settings { padding: 8px 4px 12px; }
+.scatter-heading span, .plot-heading span, #tab_body .sub, #tab_body details.gear summary { line-height: 1.5; }

@@ -22,10 +22,10 @@ function computeSeries(page) {
   for (const f of src) {
     const nums = numericColumns(f.table);
     if (!nums.length) {
-      warns.push(`「${f.name}」に数値の列が見つかりません。表の上にタイトル行がある場合は、「データ」の ⚙ から「上から飛ばす行数」を増やしてみてください。`);
+      warns.push(`「${f.name}」に数値の列が見つかりません。表の上にタイトル行がある場合は、「データ」のファイル設定から「上から飛ばす行数」を増やしてみてください。`);
       continue;
     }
-    if (nums.length < 2) warns.push(`「${f.name}」は数値の列が 1 つしかありません。列の名前の行がずれているときは、「データ」の ⚙ から「上から飛ばす行数」を直してみてください。`);
+    if (nums.length < 2) warns.push(`「${f.name}」は数値の列が 1 つしかありません。列の名前の行がずれているときは、「データ」のファイル設定から「上から飛ばす行数」を直してみてください。`);
     let sel = st.sel[f.name];
     if (!sel || !nums.includes(sel.x)) sel = st.sel[f.name] = { x: nums[0], ys: sel ? sel.ys : null };
     if (!sel.ys) sel.ys = nums.filter(c => c !== sel.x).slice(0, 1);
@@ -82,6 +82,10 @@ function draw(page, series, warns, info) {
   });
   if (!results.length) return { prims, ...FIG };
   const rows = results.map(({ s, r, x0, x1 }) => [s.label, r.n, `${g4(x0)} 〜 ${g4(x1)}`, g4(r.slope), g4(r.stderr), g4(r.intercept), g4(r.interceptStderr), g4(r.r2), g4(r.r), g4(r.p)]);
+  const summary = `<h3>回帰結果 <span>${rows.length} 系列</span></h3>${rows.length > 3 ? `<div class="result-scroll-note">下に続きます ↓</div>` : ""}<div class="result-summary-list"${rows.length > 3 ? ` tabindex="0" role="region" aria-label="回帰結果の系列"` : ""}>` + rows.map((row, i) =>
+    `<section class="result-series"><h4><span class="swatch" style="background:${results[i].s.color}"></span><span class="result-series-name" title="${esc(row[0])}">${esc(row[0])}</span></h4><dl>` +
+    [["傾き", row[3]], ["切片", row[5]], ["R²", row[7]], ["r", row[8]], ["p 値", row[9]]].map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join("") +
+    `</dl></section>`).join("") + `</div><a href="#below">詳細を見る</a>`;
   const html = `<h3>回帰直線の結果 <span style="font-weight:normal;color:var(--muted)">y = 傾き × x + 切片</span>
       <button class="btn" id="copy_res" title="Excel や Word に貼り付けられる形でコピーします">表をコピー</button></h3>
     <div class="scroll"><table class="tbl"><tr>${RES_COLS.map(c => `<th>${c}</th>`).join("")}</tr>` +
@@ -92,7 +96,7 @@ function draw(page, series, warns, info) {
     const tsv = [RES_COLS, ...rows].map(r => r.join("\t")).join("\n");
     try { await navigator.clipboard.writeText(tsv); toast("📋 表をコピーしました"); } catch (e) { toast("コピーできませんでした"); }
   };
-  return { prims, ...FIG, html, bindBelow };
+  return { prims, ...FIG, html, summary, bindBelow };
 }
 
 // ---------------------------------------------------------------- 右の設定欄
@@ -103,18 +107,19 @@ const panels = {
     let h = page.dropHTML();
     if (page.S.files.length) h += `<div class="sub" style="margin:-6px 0 12px">ファイルごとに横軸と縦軸を選びます。縦軸は複数選べ、全部が 1 枚に重なります。</div>`;
     let si = 0;
+    if (!page.fileExpanded && page.sources().length) page.fileExpanded = new Set(page.sources().length === 1 ? [page.sources()[0].name] : []);
     page.sources().forEach((f, fi) => {
       const nums = numericColumns(f.table), sel = st.sel[f.name];
-      h += `<div class="card"><h4><span class="nm" title="${esc(f.name)}">📁 ${esc(f.name)}</span></h4>` + page.gearHTML(f, fi);
-      if (!nums.length || !sel) { h += `<div class="warn">数値の列が見つかりません</div></div>`; return; }
+      h += `<details class="card file-card" data-name="${esc(f.name)}" ${page.fileExpanded?.has(f.name) ? "open" : ""}><summary><span class="file-name" title="${esc(f.name)}">${esc(f.name)}</span><span class="file-count">${sel ? `縦軸 ${sel.ys.length} 列` : "未選択"}</span></summary><div class="file-settings">` + page.gearHTML(f, fi);
+      if (!nums.length || !sel) { h += `<div class="warn">数値の列が見つかりません</div></div></details>`; return; }
       h += `<label class="fld2"><span>横軸 (x)</span><select data-f="${fi}" data-k="x">${opts(nums.map(c => [c, c]), sel.x)}</select></label>
-        <div class="fld2"><span>縦軸 (y)<small>(選ばないとこのファイルは使いません)</small></span><div class="checks">`;
+        <div class="fld2"><span>縦軸 (y)<small>選ばない場合はこのファイルを使いません</small></span><div class="checks">`;
       for (const c of nums) {
         if (c === sel.x) continue;
         const on = sel.ys.includes(c), color = on ? COLORS[si++ % COLORS.length] : "transparent";
         h += `<label><input type="checkbox" data-f="${fi}" data-k="y" value="${esc(c)}" ${on ? "checked" : ""}><span class="swatch" style="background:${color}"></span>${esc(c)}</label>`;
       }
-      h += `</div></div></div>`;
+      h += `</div></div></div></details>`;
     });
     return h + page.howtoHTML();
   },
@@ -130,7 +135,7 @@ const panels = {
           <label class="fld2"><span>x の最大</span><input type="number" step="any" id="p_fitmax" value="${numVal(st.fitMax)}"></label></div>`;
       }
     }
-    return h + `<div class="sub" style="margin-top:14px">結果(傾き・切片・R² など)はグラフの下に出ます。</div>`;
+    return h + `<div class="sub" style="margin-top:14px">結果(傾き・切片・R² など)はグラフの横と下に表示します。</div>`;
   },
   label(page, series) {
     const st = page.S.st;
@@ -152,6 +157,7 @@ const panels = {
 function bind(page, tab, body) {
   const st = page.S.st, on = (sel, ev, fn) => body.querySelectorAll(sel).forEach(n => n.addEventListener(ev, fn));
   if (tab === "data") {
+    on(".file-card", "toggle", e => { const el = e.currentTarget; if (!el.isConnected) return; if (el.open) page.fileExpanded.add(el.dataset.name); else page.fileExpanded.delete(el.dataset.name); });
     on("[data-k=x], [data-k=y]", "change", e => {
       const t = e.target, f = page.sources()[+t.dataset.f], sel = st.sel[f.name];
       if (t.dataset.k === "x") { sel.x = t.value; sel.ys = sel.ys.filter(y => y !== t.value); }

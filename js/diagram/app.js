@@ -35,7 +35,7 @@ async function refreshList() {
   $("d_restore").disabled = !n;
   // 名前を決めていない新しい図には、fig1、fig2 … のうち空いている番号の名前をつける
   if (!cur.id && !cur.defaultName) cur.defaultName = nextName("fig", list.map(r => r.name));
-  $("d_name").placeholder = cur.id ? "" : `${cur.defaultName}(図形を置くと自動で保存)`;
+  $("d_name").placeholder = cur.id ? "" : cur.defaultName;
   return list;
 }
 

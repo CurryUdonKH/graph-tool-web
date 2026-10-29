@@ -21,11 +21,11 @@
   <div class="bar-document">
   <div class="doc">
     <select id="d_pick" title="前に作った図を開きます" aria-label="開く図"></select>
-    <input id="d_name" placeholder="図形を置くと自動で決まります" title="名前。書き出すファイルの名前にもなります(空白は - になります)" aria-label="名前">
+    <input id="d_name" placeholder="fig1" title="新しい図は図形を置くと自動保存されます。名前が空欄なら fig1 などが自動で付き、書き出しにも使います(空白は - になります)" aria-label="名前">
     <span id="d_status"></span>
   </div>
   <div class="sp"></div>
-  <button class="btn" id="d_snap" title="今の状態を残しておきます。いろいろ試したあとで「戻す」からこの状態に戻れます。">📌 一時保存</button>
+  <button class="btn" id="d_snap" title="今の状態を残しておきます。いろいろ試したあとで「戻す」からこの状態に戻れます。">一時保存</button>
   <div class="popwrap"><button class="btn" id="d_restore" title="一時保存した状態に戻します">↩ 戻す(0)</button><div class="pop" id="p_restore"></div></div>
   <div class="popwrap"><button class="btn" id="d_file">ファイル ▾</button>
     <div class="pop" id="p_file">
@@ -33,17 +33,17 @@
       <button class="item" id="f_dup">📄 この図を複製<br><small>まるごと「…-copy」という名前で保存して開く</small></button>
       <button class="item" id="f_merge">🧩 別の図を取り込む(合成)<br><small>選んだ図の中身を、今の図の下か右に足す</small></button>
       <div class="sepline"></div>
-      <button class="item" id="m_backup">⬇ バックアップを書き出す<br><small>保存した図・グラフを 1 つのファイルにまとめて保存</small></button>
+      <button class="item" id="m_backup">バックアップを書き出す<br><small>保存した図・グラフを 1 つのファイルにまとめて保存</small></button>
       <button class="item" id="m_restore">⬆ バックアップを読み込む<br><small>書き出したファイルから戻す</small></button>
       <input type="file" id="f_backup" accept="application/json,.json" hidden>
       <div class="sepline"></div>
       <button class="item danger" id="d_delete">🗑 この図を削除</button>
     </div>
   </div>
-  <button class="btn primary" id="d_export" title="描いた範囲だけを書き出します(グリッド・下絵・選択の印は入りません)。形式と保存先は、次の画面で選べます">⬇ 書き出す</button>
+  <button class="btn primary" id="d_export" title="描いた範囲だけを書き出します(グリッド・下絵・選択の印は入りません)。形式と保存先は、次の画面で選べます">書き出す</button>
   <div class="popwrap"><button class="btn icon" id="d_more" title="使い方・数式の書き方・保存について" aria-label="ヘルプ">？</button>
     <div class="pop" id="p_more">
-      <a class="item" href="help.html" target="_blank" rel="noopener">📖 使い方(別のタブで開く)</a>
+      <a class="item" href="help.html" target="_blank" rel="noopener">使い方(別のタブで開く)</a>
       <button class="item" id="m_math">∑ 数式の書き方(上付き・下付き・ギリシャ文字)</button>
       <button class="item" id="m_about">ⓘ 保存について</button>
     </div>
@@ -75,7 +75,7 @@
     </div>
   </div>
   <div id="main">
-    <aside class="tool-panel" aria-label="作図の道具"><div class="panel-heading"><b>道具</b><span>選んで図に置く</span></div><div id="palette"></div></aside>
+    <aside class="tool-panel" aria-label="作図の道具"><div class="panel-heading"><b>道具</b><span>選んで図に置く</span></div><nav class="tool-categories" aria-label="道具の種類"><button type="button" data-category="shape" aria-pressed="true">図形</button><button type="button" data-category="line" aria-pressed="false">線</button><button type="button" data-category="gate" aria-pressed="false">ゲート</button></nav><div id="palette"></div></aside>
     <div class="canvas-panel"><div class="canvas-heading"><b>作図スペース</b><span>図形を置いて、線でつなぎます</span></div><div id="wrap"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg><textarea id="edit" rows="1"></textarea></div></div>
     <aside class="properties-panel" aria-label="選択したものの設定"><div class="panel-heading"><b>設定</b><span>選択したものを調整</span></div><div id="side"></div></aside>
   </div>

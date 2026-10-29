@@ -68,7 +68,7 @@ export function createDataPage(cfg) {
     const empty = !page.S.files.length;
     $("empty").hidden = !empty;
     $("plot_wrap").hidden = empty;
-    if (empty) { $("warns").innerHTML = $("below").innerHTML = ""; page.last = { prims: [], series: [] }; return; }
+    if (empty) { $("warns").innerHTML = $("below").innerHTML = ""; const summary = $("result_summary"); if (summary) { summary.innerHTML = ""; summary.hidden = true; } page.last = { prims: [], series: [] }; return; }
     const { series, warns } = cfg.computeSeries(page);
     const info = [];
     const out = cfg.draw(page, series, warns, info);
@@ -82,6 +82,8 @@ export function createDataPage(cfg) {
     $("warns").innerHTML = [...new Set(warns)].map(w => `<div class="w">⚠ ${w.includes("<code>") ? w : esc(w)}</div>`).join("")
       + info.map(w => `<div class="i">${esc(w)}</div>`).join("");
     $("below").innerHTML = out.html || "";
+    const summary = $("result_summary");
+    if (summary) { summary.innerHTML = out.summary || ""; summary.hidden = !out.summary; }
     if (out.bindBelow) out.bindBelow();
   };
 
@@ -105,7 +107,7 @@ export function createDataPage(cfg) {
   };
 
   // 読み込みの欄と、ファイルごとの ⚙(シート・飛ばす行数・取り外し)
-  page.dropHTML = () => `<div id="drop"><b>Excel / CSV をここにドラッグ</b><br>またはクリックしてファイルを選ぶ(複数可)</div>` + libraryHTML();
+  page.dropHTML = () => `<button type="button" id="drop"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h6l2 2h8v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M12 11v6m-3-3h6"/></svg><span class="drop-copy"><strong>ファイルを選択</strong><span>Excel / CSV をドロップ・複数可</span></span></button>` + libraryHTML();
 
   // ---------------------------------------------------------------- ほかのグラフ・図で読み込んだファイルを使う
   // (手元版では、読み込んだファイルをどの画面でも使えた。その代わり)
@@ -144,7 +146,7 @@ export function createDataPage(cfg) {
     page.changed(true);
   }
   page.gearHTML = (f, fi) => {
-    let h = `<details class="gear"><summary>⚙ シート・飛ばす行数・取り外し</summary><div>`;
+    let h = `<details class="gear"><summary>シート・行数・取り外し</summary><div>`;
     if (f.excel && (f.sheets || []).length > 1)
       h += `<label class="fld2"><span>シート</span><select data-f="${fi}" data-k="sheet">${opts(f.sheets.map(s => [s, s]), f.sheet)}</select></label>`;
     if (f.range) h += `<div class="fld2"><span>使う範囲</span><b>${rangeLabel(f.range)}</b>(元のファイルで選んだ範囲${f.range.header ? "。1 行目が列の名前" : ""})</div>
@@ -155,7 +157,7 @@ export function createDataPage(cfg) {
       <button class="btn wide" style="margin-bottom:8px" data-f="${fi}" data-k="showraw">元のファイルを見て、範囲を選ぶ</button>`;
     return h + `<button class="btn wide danger" data-f="${fi}" data-k="remove">このファイルを外す</button></div></details>`;
   };
-  page.howtoHTML = () => `<details class="gear"><summary>📝 ファイルの作り方</summary><div class="sub">
+  page.howtoHTML = () => `<details class="gear"><summary>ファイルの作り方</summary><div class="sub">
     ・1 行目に列の名前(例:<code>時間 [s]</code>、<code>温度 [℃]</code>)<br>・2 行目から数値<br>・1 列に 1 種類のデータ<br>
     ・「1,200」や全角の数字も、自動で数値として読みます<br>・CSV の文字コード(UTF-8 / Shift_JIS)は自動で見分けます<br>
     ・表の上にタイトルやメモの行があっても、列の名前の行を自動で探します</div></details>`;
@@ -420,7 +422,7 @@ export function createDataPage(cfg) {
         item.skip = guessSkip(rows); item.range = null;
         item.table = buildTable(rows, item);
         S.files.push(item); added.push(name);
-        if (item.skip) notes.push(`「${name}」は、上の ${item.skip} 行を飛ばして読みました(⚙ で変えられます)`);
+        if (item.skip) notes.push(`「${name}」は、上の ${item.skip} 行を飛ばして読みました(ファイル設定で変えられます)`);
       } catch (e) {
         console.error(e);
         dialog("読み込めませんでした", `<p>「${esc(file.name)}」を読み込めませんでした。</p><p><small>${esc(e.message || e)}</small></p>`);
