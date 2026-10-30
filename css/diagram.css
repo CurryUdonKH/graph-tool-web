@@ -178,3 +178,25 @@ svg#svg { display: block; user-select: none; }
 .view-actions .chk:hover { background: var(--surface-soft); }
 .view-actions .chk:has(input:checked):hover { background: var(--accent-soft); }
 .panel-heading span, .canvas-heading span, #side .empty { line-height: 1.5; }
+
+/* 手書き図の変換結果を確認する小窓 */
+.sketch-dialog { width: min(720px, 94vw); max-width: min(720px, 94vw); max-height: 90vh; overflow-y: auto; }
+.sketch-dialog p { font-size: var(--text-ui); line-height: 1.5; }
+.sketch-prompt-actions, .sketch-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.sketch-prompt-actions span, .sketch-note { color: var(--muted); font-size: var(--text-small); }
+.sketch-instructions { margin: var(--space-2) 0 var(--space-3); }
+.sketch-instructions summary { cursor: pointer; color: var(--accent); }
+.sketch-dialog textarea { display: block; width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-2); font: inherit; }
+.sketch-instructions textarea { margin-top: var(--space-2); }
+.sketch-label { display: block; margin-bottom: var(--space-1); font-weight: 600; }
+.sketch-actions { margin-top: var(--space-2); }
+.sketch-file { display: inline-flex; align-items: center; cursor: pointer; }
+.sketch-error { margin: var(--space-2) 0; color: var(--danger); }
+.sketch-dialog h4 { margin: var(--space-3) 0 var(--space-1); font-size: var(--text-ui); }
+.sketch-preview { max-height: 240px; overflow: auto; padding: var(--space-2); border: 1px solid var(--line); background: var(--surface); }
+.sketch-preview svg { display: block; width: 100%; height: 220px; }
+.sketch-warnings { margin-top: var(--space-3); padding: var(--space-3); background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--radius); }
+.sketch-warnings ul { margin: var(--space-2) 0; padding-left: 20px; overflow-wrap: anywhere; }
+
+/* 確認・キャンセルをスクロール中も表示する。 */
+.sketch-dialog .acts { position: sticky; bottom: -18px; z-index: 1; margin: var(--space-3) -20px -18px; padding: var(--space-3) 20px; background: var(--surface); border-top: 1px solid var(--line); }

@@ -2168,7 +2168,7 @@ function setZoom(z, cx, cy) {     // (cx, cy) は画面上で動かさない点(
 }
 const STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 2.5, 3, 4];
 const zoomStep = dir => setZoom(dir > 0 ? (STEPS.find(v => v > S.zoom + 1e-6) ?? 4) : ([...STEPS].reverse().find(v => v < S.zoom - 1e-6) ?? 0.25));
-function zoomFit() {
+function zoomFit(maxZoom = 4) {
   const pts = [];
   for (const p of buildPrims()) {
     if (p.k === "ellipse") pts.push({ x: p.cx - p.rx, y: p.cy - p.ry }, { x: p.cx + p.rx, y: p.cy + p.ry });
@@ -2181,7 +2181,7 @@ function zoomFit() {
   if (!pts.length) { setZoom(1); wrap.scrollLeft = wrap.scrollTop = 0; return; }
   const x0 = Math.min(...pts.map(p => p.x)) - 30, x1 = Math.max(...pts.map(p => p.x)) + 30;
   const y0 = Math.min(...pts.map(p => p.y)) - 30, y1 = Math.max(...pts.map(p => p.y)) + 30;
-  S.zoom = Math.min(4, Math.max(0.25, Math.floor(Math.min(wrap.clientWidth / (x1 - x0), wrap.clientHeight / (y1 - y0)) * 100) / 100));
+  S.zoom = Math.min(maxZoom, Math.max(0.25, Math.floor(Math.min(wrap.clientWidth / (x1 - x0), wrap.clientHeight / (y1 - y0)) * 100) / 100));
   try { localStorage.setItem("diagram_zoom", S.zoom); } catch (e) {}
   render();
   wrap.scrollLeft = x0 * S.zoom; wrap.scrollTop = y0 * S.zoom;
@@ -2189,7 +2189,7 @@ function zoomFit() {
 $("z_in").onclick = () => zoomStep(1);
 $("z_out").onclick = () => zoomStep(-1);
 $("z_reset").onclick = () => setZoom(1);
-$("z_fit").onclick = zoomFit;
+$("z_fit").onclick = () => zoomFit();
 // ⌘ + スクロール / ピンチ で拡大・縮小(サイト全体ではなく、この画面だけ)
 let resizeT = null;
 window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(render, 100); });
@@ -2282,4 +2282,10 @@ export function replaceDoc(doc) {
 }
 export const getDoc = () => S.doc;
 export const getPrims = () => buildPrims();
+// プレビューでは画面や保存対象を変更しない。描画計算の間だけ参照先を切り替える。
+export function previewDocPrims(doc) {
+  const previous = S.doc;
+  try { S.doc = doc; return buildPrims(); }
+  finally { S.doc = previous; }
+}
 export { zoomFit };

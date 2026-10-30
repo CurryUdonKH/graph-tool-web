@@ -1,8 +1,9 @@
 // 作図ページの上の帯:図の一覧・開く・名前・自動保存・一時保存と「戻す」・削除・書き出し・バックアップ
 // 保存先はブラウザの中(IndexedDB)。サーバーには何も送らない。
 
-import { initEditor, loadDoc, replaceDoc, getDoc, getPrims, flushChanges } from "./editor.js";
+import { initEditor, loadDoc, replaceDoc, getDoc, getPrims, flushChanges, zoomFit } from "./editor.js";
 import * as store from "../store.js";
+import { bindSketchImport } from "./sketch-ui.js";
 import { exportWithPreview } from "../exportdialog.js";
 import { $, esc, pad, hms, hm, mdhm, nextName, toast, setStatus, dialog, bindPop, bindMoreMenu } from "../ui.js";
 
@@ -268,6 +269,17 @@ async function start() {
   $("f_new").onclick = () => newDiagram();
   $("f_dup").onclick = () => duplicateCurrent();
   $("f_merge").onclick = () => openMerge();
+  bindSketchImport(async doc => {
+    flushChanges();
+    await chain;
+    const name = nextName("fig", (await store.listDiagrams()).map(r => r.name));
+    const now = store.nowISO();
+    const rec = { id: store.newId(), name, created: now, updated: now, doc: clone(doc), snapshots: [] };
+    await store.addDiagram(rec); // add は ID が衝突した場合に失敗し、既存の図を変更しない。
+    store.notify({ type: "saved", id: rec.id });
+    try { await openDiagram(rec.id); zoomFit(1); }
+    catch (e) { console.error(e); toast("図は作成されましたが開けませんでした。一覧から開いてください。"); }
+  });
   bindMoreMenu({ beforeBackup: async () => { flushChanges(); await chain; }, onImported: refreshList });
   $("d_delete").onclick = deleteCurrent;
   $("d_export").onclick = () => doExport();
@@ -284,6 +296,7 @@ async function start() {
     const last = await store.getSetting("lastDiagram");
     const pick = list.find(r => r.id === last) || (last === null ? null : list[0]);
     if (pick) await openDiagram(pick.id); else await refreshList();
+    if (location.hash === "#sketch-import") $("f_sketch").click();
   } catch (e) {
     console.error(e);
     dialog("保存の機能が使えません", `<p>このブラウザでは図を保存できないようです(プライベートブラウズでは使えないことがあります)。描くことと書き出しはできます。</p><p><small>${esc(e.message || e)}</small></p>`);

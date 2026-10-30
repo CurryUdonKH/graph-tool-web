@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/common.css">
-<link rel="stylesheet" href="css/page.css">
+<link rel="stylesheet" href="css/home.css">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -34,61 +34,40 @@
 </script>
 </head>
 <body>
-<header class="site">
-  <a class="brand" href="./"><img src="favicon.svg" alt="" width="24" height="24">実験データ グラフ作成ツール</a>
-  <nav><a href="diagram.html">図の作成</a><a href="scatter.html">散布図(ベータ版)</a><a href="help.html">使い方</a></nav>
+<header class="home-header">
+  <div class="header-inner">
+    <a class="home-brand" href="./"><img src="favicon.svg" alt="" width="28" height="28"><span>実験データ<br><b>グラフ作成ツール</b></span></a>
+    <nav aria-label="メインメニュー"><a href="diagram.html">図の作成</a><a href="scatter.html">散布図 <small>ベータ版</small></a><a href="help.html">使い方</a></nav>
+  </div>
 </header>
-<main class="wide">
-  <section class="hero">
-    <div class="hero-copy"><p class="eyebrow">実験レポートのための作図ツール</p>
-    <h1>実験レポートの図を、<br>ブラウザだけで無料作成</h1>
-    <p class="lead">状態遷移図・ブロック図・論理回路を、<b>登録なし・インストールなし</b>で作って、<b>LaTeX に入れやすい PDF</b> や Word 用の PNG で保存できます。Excel / CSV からの散布図と回帰直線も、ベータ版で使えます。理系大学生の実験レポートのために作りました。</p>
-    <div class="cta">
-      <a class="btn-big primary" href="diagram.html">図を描く</a>
-      <a class="btn-big" href="scatter.html">散布図を作る(ベータ版)</a>
+<main>
+  <section class="home-hero wrap">
+    <div class="hero-copy">
+      <p class="eyebrow"><span></span> 実験レポートのための作図ツール</p>
+      <h1>考えたことを、<br><em>伝わる図に。</em></h1>
+      <p class="hero-lead">状態遷移図も、論理回路も。<br>ブラウザで描いて、レポートに使える形に。</p>
+      <div class="hero-actions"><a class="action primary" href="diagram.html">図の作成画面へ <span aria-hidden="true">→</span></a><a class="action secondary" href="diagram.html">保存した図を開く <span aria-hidden="true">↗</span></a></div>
+      <p class="action-note">保存した図は、作図画面の一覧から選べます。操作はパソコンをおすすめします。</p>
+      <div class="hero-facts"><span>登録不要</span><span>ブラウザ内に自動保存</span><span>PDF・PNG・SVG</span></div>
     </div>
-    <p class="hero-trust">無料・登録不要・データはブラウザ内に保存</p></div>
-    <div class="hero-visual" aria-hidden="true">
-      <div class="visual-bar"><span></span><span></span><span></span><b>図の作成</b></div>
-      <svg viewBox="0 0 480 290"><defs><marker id="hero-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 9 5 1 9" fill="none" stroke="#476bc2" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect x="0" y="0" width="480" height="290" fill="#f6f8fc"/><g stroke="#dce3ef" stroke-width="1"><path d="M0 48H480 M0 96H480 M0 144H480 M0 192H480 M0 240H480"/><path d="M48 0V290 M96 0V290 M144 0V290 M192 0V290 M240 0V290 M288 0V290 M336 0V290 M384 0V290 M432 0V290"/></g><g fill="white" stroke="#24365c" stroke-width="3"><ellipse cx="140" cy="145" rx="70" ry="43"/><ellipse cx="340" cy="145" rx="70" ry="43"/></g><g fill="none" stroke="#476bc2" stroke-width="3" marker-end="url(#hero-arrow)"><path d="M195 119 C235 76 267 76 305 116"/><path d="M285 171 C245 214 213 214 175 174"/></g><g fill="#24365c" font-size="24" text-anchor="middle"><text x="140" y="154">S₀</text><text x="340" y="154">S₁</text></g></svg>
-      <div class="visual-caption"><b>状態遷移図</b><span>作った図は PDF・PNG・SVG に</span></div>
+    <div class="preview" aria-label="作図画面のイメージ">
+      <div class="preview-head"><span class="preview-icon">▦</span><b>図の作成</b><span class="preview-save">● 保存済み</span></div>
+      <div class="preview-body"><div class="preview-tools" aria-hidden="true"><span class="selected">↖</span><span>□</span><span>○</span><span>↗</span><span>Ｔ</span></div>
+        <div class="preview-canvas"><svg viewBox="0 0 500 320" role="img" aria-label="状態遷移図の例"><defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M1 1 L8 4.5 L1 8" fill="none" stroke="#315fa9" stroke-width="1.3"/></marker></defs><g fill="#fff" stroke="#263c57" stroke-width="2.5"><ellipse cx="135" cy="162" rx="66" ry="43"/><ellipse cx="365" cy="162" rx="66" ry="43"/></g><g fill="none" stroke="#315fa9" stroke-width="2.5" marker-end="url(#arrow)"><path d="M192 139 C230 95 274 95 309 137"/><path d="M308 185 C270 229 226 229 191 187"/></g><g fill="#263c57" font-family="sans-serif" text-anchor="middle" font-size="23"><text x="135" y="170">S₀</text><text x="365" y="170">S₁</text></g></svg><span class="canvas-label">状態遷移図の例</span></div></div>
+      <div class="preview-footer"><span>図形と線を組み合わせて作図</span><span>＋　−　100%</span></div>
     </div>
   </section>
-
-  <h2 class="sec-title">作れる図</h2>
-  <div class="tools">
-    <a class="tool-card" href="diagram.html">
-      <svg viewBox="0 0 220 110" aria-hidden="true"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 9 5 1 9" fill="none" stroke="#2a78d6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><g fill="#fff" stroke="#1f1f1d" stroke-width="2"><ellipse cx="45" cy="55" rx="32" ry="22"/><ellipse cx="175" cy="55" rx="32" ry="22"/></g><g fill="none" stroke="#2a78d6" stroke-width="2" marker-end="url(#ah)"><path d="M70 41 C 92 20 128 20 148 40"/><path d="M150 69 C 128 90 92 90 72 70"/></g><text x="45" y="60" font-size="14" text-anchor="middle" font-family="serif" font-style="italic">S₀</text><text x="175" y="60" font-size="14" text-anchor="middle" font-family="serif" font-style="italic">S₁</text></svg>
-      <h3>図の作成</h3>
-      <p>状態遷移図・ブロック図・論理回路をマウスで描く。論理ゲート(AND・OR・NOT・NAND・NOR・XOR・D フリップフロップ)と、縦横に自動で引ける配線。</p>
-    </a>
-    <a class="tool-card" href="scatter.html">
-      <svg viewBox="0 0 220 110" aria-hidden="true"><path d="M30 10 V95 H210" fill="none" stroke="#888" stroke-width="1.5"/><path d="M38 88 L200 22" stroke="#2a78d6" stroke-width="2"/><path d="M38 80 L200 50" stroke="#eb6834" stroke-width="2"/><g fill="#2a78d6"><circle cx="45" cy="84" r="4"/><circle cx="80" cy="72" r="4"/><circle cx="115" cy="56" r="4"/><circle cx="150" cy="44" r="4"/><circle cx="190" cy="26" r="4"/></g><g fill="#eb6834"><rect x="52" y="74" width="7" height="7"/><rect x="92" y="66" width="7" height="7"/><rect x="132" y="60" width="7" height="7"/><rect x="172" y="51" width="7" height="7"/></g></svg>
-      <h3>散布図と回帰直線 <span class="tag beta">ベータ版</span></h3>
-      <p>Excel / CSV を読み込んで点を重ねて描き、最小二乗法の回帰直線。傾き・切片(± 標準誤差)・R²・相関係数・p 値を表で出してコピー。</p>
-    </a>
-  </div>
-
-  <h2 class="sec-title">3 ステップで完成</h2>
-  <ol class="steps">
-    <li><b>開く</b><span>上のボタンから、作りたい図の画面を開きます。登録はいりません。</span></li>
-    <li><b>作る</b><span>図形や論理ゲートを置いて、線や配線でつなぎます。文字は <code>$10^{-3}$</code> や <code>$\alpha$</code> のように LaTeX の書き方で数式にできます。</span></li>
-    <li><b>保存する</b><span>「書き出す」から PDF / PNG / SVG で保存。LaTeX には PDF、Word には PNG がおすすめです。</span></li>
-  </ol>
-
-  <section class="statement"><p>考えたことを、図にする。<br>そのまま、レポートへ。</p></section>
-
-  <h2 class="sec-title">特長</h2>
-  <div class="features">
-    <div><b>💰 無料・登録不要</b><span>ブラウザで開くだけ。インストールもいりません。</span></div>
-    <div><b>🔒 データが外に出ない</b><span>図や読み込んだデータは、あなたのブラウザの中だけに保存されます。</span></div>
-    <div><b>∑ LaTeX の数式</b><span>上付き・下付き・ギリシャ文字・分数を、LaTeX と同じ書き方で。</span></div>
-    <div><b>📄 LaTeX・Word に貼れる</b><span>PDF・SVG は拡大しても荒れません。PNG は 300 dpi。</span></div>
-    <div><b>🔌 論理回路も楽に</b><span>端子をクリックするだけで、配線を縦横に自動で引けます。途中から分岐も。</span></div>
-    <div><b>💾 自動保存</b><span>作ったものは自動で保存。次に開くと続きから。バックアップも書き出せます。</span></div>
-  </div>
-
-  <h2 class="sec-title">よくある質問</h2>
+  <section class="tools-section" aria-labelledby="tools-title"><div class="wrap">
+    <div class="section-head"><div><p class="eyebrow">作りたいものから始める</p><h2 id="tools-title">図もグラフも、ここから。</h2></div><p>レポートに必要な図を、<br>自分のデータに合わせて作れます。</p></div>
+    <div class="tool-grid">
+      <a class="tool-card" href="diagram.html"><div class="tool-number">01 <span>作図</span></div><h3>図の作成 <span aria-hidden="true">↗</span></h3><p>図形や矢印、論理ゲートを組み合わせて、状態遷移図や回路図を描けます。</p><div class="tool-tags"><span>状態遷移図</span><span>論理回路</span><span>ブロック図</span></div><b class="tool-link">作図画面を開く →</b></a>
+      <a class="tool-card" href="scatter.html"><div class="tool-number">02 <span>グラフ</span></div><h3>散布図 <small>ベータ版</small> <span aria-hidden="true">↗</span></h3><p>Excel・CSV のデータから散布図を作成。回帰直線や傾きも確認できます。</p><div class="tool-tags"><span>Excel・CSV</span><span>回帰直線</span></div><b class="tool-link">散布図を開く →</b></a>
+    </div>
+  </div></section>
+  <section class="sketch-intro wrap" aria-labelledby="sketch-intro-title"><div><p class="eyebrow">手書きから作り始める</p><h2 id="sketch-intro-title">手書き図を、編集できる図へ。</h2><p>手書き画像を普段お使いの AI で変換し、返された JSON を作図画面に取り込みます。見本を確認してから新しい図を作成できます。</p><p class="sketch-intro-note">対応: 四角・楕円・台形・多角形・注釈・文字・直線と矢印。論理ゲートと曲線は取り込めません。</p></div><a class="action secondary" href="diagram.html#sketch-import">手書き図の取り込みへ →</a></section>
+  <section class="workflow wrap" aria-labelledby="workflow-title"><div class="workflow-intro"><p class="eyebrow">使い方</p><h2 id="workflow-title">描いて、整えて、<br>レポートへ。</h2><p>インストールや登録は不要。<br>ブラウザを開いたら、すぐに始められます。</p><a class="text-link" href="help.html">詳しい使い方を見る →</a></div><ol class="workflow-list"><li><span>01</span><div><h3>作りたい図を開く</h3><p>作図または散布図の画面を選びます。</p></div></li><li><span>02</span><div><h3>自分の図を作る</h3><p>図形や線、文字を配置。数式も入力できます。</p></div></li><li><span>03</span><div><h3>必要な形式で書き出す</h3><p>PDF・PNG・SVG から選んで、レポートに使えます。</p></div></li></ol></section>
+  <section class="save-section"><div class="wrap save-inner"><div><p class="eyebrow">保存について</p><h2>続きから、また始められます。</h2><p>作成中の図はこのブラウザに自動保存されます。別の端末で使うときや、大切な図を残すときは、バックアップを書き出してください。</p></div><a class="action secondary" href="help.html">保存とバックアップの使い方 →</a></div></section>
+  <section class="faq-section wrap" aria-labelledby="faq-title"><div><p class="eyebrow">知っておきたいこと</p><h2 id="faq-title">よくある質問</h2></div>
   <div class="faq">
     <details><summary>本当に無料ですか? 登録はいりますか?</summary><p>無料で、登録もいりません。ブラウザでページを開くだけで使えます。</p></details>
     <details><summary>作った図を LaTeX のレポートに入れられますか?</summary><p>はい。「書き出す → PDF」で保存して、<code>\includegraphics{fig1.pdf}</code> のように読み込めます。文字は線に変えて書き出すので、どのパソコンでも同じ見た目になります。</p></details>
@@ -96,13 +75,10 @@
     <details><summary>論理回路や状態遷移図も描けますか?</summary><p>はい。AND・OR・NOT・NAND・NOR・XOR・XNOR・バッファ・D フリップフロップを置いて、配線を縦横に自動で引けます。状態遷移図の「状態」と矢印(直線・曲線・自分に戻るループ)も描けます。</p></details>
     <details><summary>データはどこに保存されますか?</summary><p>あなたのブラウザの中だけです。インターネットの向こう(サーバー)には送られません。別のパソコンで使うときは「ファイル → バックアップを書き出す」で持ち運べます。</p></details>
   </div>
-
-  <footer class="site-foot">
-    <div class="links"><a href="help.html">📖 使い方</a><a href="privacy.html">🔒 プライバシーポリシー</a></div>
-    <p>マウスで操作するので、パソコンでの利用をおすすめします。</p>
-    <p>日本語フォント:Noto Sans JP(SIL Open Font License)・ 数式:MathJax ・ PDF:jsPDF / svg2pdf.js ・ Excel:SheetJS</p>
-  </footer>
+  </section>
+  <section class="closing wrap"><div><p class="eyebrow">さっそく始める</p><h2>あなたの考えを、図にしよう。</h2></div><a class="action primary" href="diagram.html">図の作成画面へ <span aria-hidden="true">→</span></a></section>
 </main>
+<footer class="home-footer"><div class="wrap"><div class="footer-main"><a class="home-brand" href="./"><img src="favicon.svg" alt="" width="28" height="28"><span>実験データ<br><b>グラフ作成ツール</b></span></a><nav aria-label="フッターメニュー"><a href="help.html">使い方</a><a href="privacy.html">プライバシーポリシー</a></nav></div><p>マウスで操作するため、パソコンでの利用をおすすめします。</p><p>日本語フォント: Noto Sans JP ・数式: MathJax ・PDF: jsPDF / svg2pdf.js ・Excel: SheetJS</p></div></footer>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",

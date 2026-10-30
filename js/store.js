@@ -49,6 +49,8 @@ export const listDiagrams = async () =>
   ((await run("diagrams", "readonly", s => s.getAll())) || []).sort((a, b) => (b.updated || "").localeCompare(a.updated || ""));
 export const getDiagram = id => run("diagrams", "readonly", s => s.get(id));
 export const putDiagram = rec => run("diagrams", "readwrite", s => s.put(rec));
+// 新規取り込みは add を使い、ID が重複しても既存の図を上書きしない。
+export const addDiagram = rec => run("diagrams", "readwrite", s => s.add(rec));
 export const deleteDiagram = id => run("diagrams", "readwrite", s => s.delete(id));
 export const listGraphs = async () =>
   ((await run("graphs", "readonly", s => s.getAll())) || []).sort((a, b) => (b.updated || "").localeCompare(a.updated || ""));

@@ -30,6 +30,7 @@
   <div class="popwrap"><button class="btn" id="d_file">ファイル ▾</button>
     <div class="pop" id="p_file">
       <button class="item" id="f_new">＋ 新しい図</button>
+      <button class="item" id="f_sketch">手書き図の JSON を取り込む<br><small>確認後、新しい図として作成</small></button>
       <button class="item" id="f_dup">📄 この図を複製<br><small>まるごと「…-copy」という名前で保存して開く</small></button>
       <button class="item" id="f_merge">🧩 別の図を取り込む(合成)<br><small>選んだ図の中身を、今の図の下か右に足す</small></button>
       <div class="sepline"></div>
@@ -81,6 +82,24 @@
   </div>
   <div id="hint"></div>
 </div>
+
+<dialog id="sketch_dialog" class="sketch-dialog" aria-labelledby="sketch_title">
+  <h3 id="sketch_title">手書き図を取り込む</h3>
+  <p>手書き画像と変換指示を普段使う AI に渡し、返された JSON を貼り付けます。画像や JSON はこのツールから送信されません。</p>
+  <div class="sketch-prompt-actions"><button type="button" class="btn" id="sketch_copy">変換指示をコピー</button><span id="sketch_copy_status" role="status"></span></div>
+  <details class="sketch-instructions"><summary>変換指示を見る・手動でコピーする</summary><textarea id="sketch_prompt" readonly rows="6" aria-label="AI への変換指示"></textarea></details>
+  <p class="sketch-note">対応: 四角、楕円、台形、多角形、注釈、文字、直線・矢印。曲線や論理ゲートは取り込めません。</p>
+  <label class="sketch-label" for="sketch_input">JSON を貼り付ける</label>
+  <textarea id="sketch_input" rows="6" spellcheck="false" placeholder="ここに JSON を貼り付け"></textarea>
+  <div class="sketch-actions"><button type="button" class="btn sketch-file" id="sketch_file_button">JSON ファイルを選択</button><input type="file" id="sketch_file" accept=".json,application/json" hidden><button type="button" class="btn" id="sketch_preview_button">内容を確認</button></div>
+  <p id="sketch_error" class="sketch-error" role="alert" hidden></p>
+  <section id="sketch_result" hidden aria-label="取り込み内容の見本">
+    <h4>取り込みの見本</h4><p class="sketch-note">位置や接続が正しいか確認してください。見本の後も編集できます。</p>
+    <div class="sketch-preview"><svg id="sketch_preview" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="取り込む図の見本"></svg></div>
+    <div id="sketch_warnings" class="sketch-warnings" hidden><b>判断できなかった点</b><ul id="sketch_warning_list"></ul><label class="ck"><input type="checkbox" id="sketch_ack">注意事項を確認しました</label></div>
+  </section>
+  <div class="acts"><button type="button" class="btn" id="sketch_cancel">やめる</button><button type="button" class="btn primary" id="sketch_confirm" disabled>新しい図として作成</button></div>
+</dialog>
 
 <dialog id="format_dialog" class="format-dialog" aria-labelledby="format_title">
   <h3 id="format_title">文字の書式</h3>
