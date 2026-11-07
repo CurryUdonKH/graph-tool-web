@@ -57,7 +57,8 @@ export async function exportWithPreview(fmt, prims, name, box, note = "", onShow
     $("x_px").textContent = cur === "png" ? `(${Math.ceil(r.w * 300 / 72)} × ${Math.ceil(r.h * 300 / 72)} ピクセル)` : "";
     $("x_where").textContent = dest === "folder" ? `「${dir.name}」フォルダ(同じ名前のファイルは上書きします)`
       : dest === "ask" ? "保存するときに、場所と名前を選びます" : "ダウンロードフォルダ";
-    $("x_use").textContent = FORMATS[cur].use;
+    $("x_use").textContent = prims.some(p => p.k === "image") && cur !== "png"
+      ? "図形と文字は拡大できます。配置画像の画質は元の解像度によります" : FORMATS[cur].use;
   };
   // フォルダを選ぶ(ボタンを押したその場で、Chrome のフォルダ選びの画面を出す)
   const chooseFolder = async () => {

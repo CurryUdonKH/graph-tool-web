@@ -4,6 +4,7 @@
 //   { k: "text", x, y, s, size, ha, va, color, rot, font }   rot は (x, y) を中心に回す角度(度)、font は text.js の FONTS の名前
 // 単位は pt(画面では 1 px)。
 
+import { isEmbeddedImage } from "./diagram/placed-image.mjs";
 import { layout, textMarkup, textOutlineMarkup } from "./text.js";
 
 const f2 = v => Math.round(v * 100) / 100;
@@ -43,7 +44,7 @@ export function primsBounds(prims) {
   for (const p of prims) {
     const pad = p.stroke === "none" ? 0 : (p.lw || 0) / 2;
     if (p.k === "ellipse") { add(p.cx - p.rx, p.cy - p.ry, pad); add(p.cx + p.rx, p.cy + p.ry, pad); }
-    else if (p.k === "rect") { add(p.x, p.y, pad); add(p.x + p.w, p.y + p.h, pad); }
+    else if (p.k === "rect" || p.k === "image" && isEmbeddedImage(p.src)) { add(p.x, p.y, pad); add(p.x + p.w, p.y + p.h, pad); }
     else if (p.k === "path") for (const q of pathPoints(p.cmds)) add(q.x, q.y, pad);
     else if (p.k === "text") for (const q of textCorners(p)) add(q.x, q.y);
   }
@@ -54,6 +55,10 @@ export function primsBounds(prims) {
 export function primsMarkup(prims, outline = false) {
   let h = "";
   for (const p of prims) {
+    if (p.k === "image") {
+      if (isEmbeddedImage(p.src)) h += `<image href="${p.src}" x="${f2(p.x)}" y="${f2(p.y)}" width="${f2(p.w)}" height="${f2(p.h)}" preserveAspectRatio="none"/>`;
+      continue;
+    }
     if (p.k === "text") {
       const L = layout(p.s, p.size, p.ha, p.va, p.font, p.styles);
       h += (outline ? textOutlineMarkup : textMarkup)(L, p.x, p.y, p.color || "#000", p.rot || 0);

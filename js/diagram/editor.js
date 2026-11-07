@@ -1,3 +1,5 @@
+import { imagePrimitive, resizeImage, readPlacedImage } from "./placed-image.mjs";
+import { toast, esc } from "../ui.js";
 import { snapToGuides } from "./snap.mjs";
 import { isWire, migrateWireTypes } from "./wiretypes.mjs";
 import { remapStyles } from "./textstyles.mjs";
@@ -548,6 +550,7 @@ function textAlign(s) {   // 文字の寄せ方(横, 縦)。決めていなけ�
 function buildPrims() {
   const out = [];
   for (const s of shapes()) {
+    if (s.type === "image") { const p = imagePrimitive(s); if (p) out.push(p); continue; }
     if (hiddenDot(s)) continue;               // 分岐していない所の ● は書き出さない
     const c = ctr(s), base = { lw: s.lw, dash: !!s.dash, fill: s.fill === "none" ? null : s.fill };
     if (s.type === "ellipse" || s.type === "dot") out.push({ k: "ellipse", cx: c.x, cy: c.y, rx: s.w / 2, ry: s.h / 2, ...base });
@@ -647,7 +650,8 @@ function render() {
   for (const p of buildPrims()) {
     const st = { stroke: "#000", "stroke-width": p.lw, "stroke-dasharray": p.dash ? `${p.lw * 5} ${p.lw * 3}` : null,
                  fill: p.fill || "none", "stroke-linecap": "round", "stroke-linejoin": "round" };
-    if (p.k === "ellipse") el("ellipse", { cx: p.cx, cy: p.cy, rx: p.rx, ry: p.ry, ...st }, layer);
+    if (p.k === "image") el("image", {href:p.src, x:p.x, y:p.y, width:p.w, height:p.h, preserveAspectRatio:"none"}, layer);
+    else if (p.k === "ellipse") el("ellipse", { cx: p.cx, cy: p.cy, rx: p.rx, ry: p.ry, ...st }, layer);
     else if (p.k === "rect") el("rect", { x: p.x, y: p.y, width: p.w, height: p.h, ...st }, layer);
     else if (p.k === "path") el("path", { d: dStr(p.cmds), ...st, fill: p.fill || "none" }, layer);
     else if (p.k === "text" && p.src !== S.editing) drawText(p, layer);   // 編集中の文字は入力欄の方だけ見せる
@@ -1440,8 +1444,12 @@ function dragMoveInner(d, p) {
     d.moved = true;
     if (["nw", "ne", "sw", "se"].includes(h.k)) {
       const q = snapP(p), fx = h.k.includes("w") ? it.x + it.w : it.x, fy = h.k.includes("n") ? it.y + it.h : it.y;
-      if (!d.fixed) d.fixed = snapP({ x: fx, y: fy });
-      const b = boxOf(d.fixed, q);
+      if (!d.fixed) d.fixed = it.type === "image" ? {x:fx,y:fy} : snapP({ x: fx, y: fy });
+      if (it.type === "image") {
+        if (!d.imageRatio) d.imageRatio = it.w / it.h;
+        Object.assign(it, resizeImage(d.fixed, q, d.imageRatio));
+      }
+      const b = it.type === "image" ? it : boxOf(d.fixed, q);
       if (b.w >= 20) { it.x = b.x; it.w = b.w; }
       if (b.h >= 20) { it.y = b.y; it.h = b.h; }
       if (it.type === "gate") fitGate(it, { x: d.fixed.x, y: d.fixed.y, right: h.k.includes("w"), bottom: h.k.includes("n") });
@@ -1588,6 +1596,7 @@ function finishElbow(to) {
 
 // ------------------------------------------------------------------ 文字の編集
 function openEditor(it) {
+  if (!it || it.type === "image") return;
   const ta = $("edit");
   let x, y, w, h, text, size;
   if (isShape(it)) {
@@ -1876,7 +1885,7 @@ const seg = (key, opts, cur) => `<div class="seg" data-key="${key}">` + opts.map
   `<button data-v="${v}" class="${String(v) === String(cur) ? "on" : ""}" title="${tip || ""}">${label}</button>`).join("") + `</div>`;
 const sicon = n => `<svg viewBox="0 0 24 16">${SIDE_ICON[n]}</svg>`;
 const aicon = n => `<svg viewBox="0 0 24 24">${ALIGN_ICON[n]}</svg>`;
-const KIND_NAME = { ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", gate: "論理ゲート", dot: "接続点", edge: "矢印・線" };
+const KIND_NAME = { image: "画像", ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", gate: "論理ゲート", dot: "接続点", edge: "矢印・線" };
 
 function underlayHTML() {
   const u = S.doc.underlay;
@@ -1917,6 +1926,11 @@ function sideHTML(items) {
     例:<code>$\\alpha$</code>、<code>$x_1$</code>、<code>$10^{-3}$</code><br>
     くわしくは右上の「？ → 数式の書き方」</details></div>`;
   const one = items[0], shapesSel = items.filter(isShape), edgesSel = items.filter(i => !isShape(i));
+  if (items.every(i => i.type === "image")) return `<div class="sec"><h4>${items.length === 1 ? "配置した画像" : `${items.length}枚の画像`}</h4>
+    ${items.length === 1 ? `<p>${esc(one.name || "画像")}</p><label>幅（pt）<input id="image_width" type="number" min="20" max="10000" step="1" value="${Math.round(one.w * 100) / 100}"></label><p>縦横比を保って拡大・縮小します。角をドラッグしても変更できます。</p>` : ""}
+    <p>画像は図と一緒に保存され、PDF・PNG・SVGにも含まれます。</p></div>
+    <div class="sec"><h4>重なりの順番</h4><div class="grid2"><button class="btn" data-stack="front">最前面へ</button><button class="btn" data-stack="back">最背面へ</button></div></div>
+    <div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   const same = k => items.every(i => i[k] === one[k]) ? one[k] : "";
   const kinds = [...new Set(items.map(i => isWire(i) ? "配線" : KIND_NAME[i.type]))].join("・");
   let h = `<div class="sec"><h4>${items.length === 1 ? kinds : `${items.length} 個を選択中(${kinds})`}</h4>`;
@@ -2037,6 +2051,11 @@ function bindSide() {
   if ($("u_op")) $("u_op").oninput = e => { u.opacity = +e.target.value; render(); push(); };
   if ($("u_del")) $("u_del").onclick = () => { pushHist(); delete S.doc.underlay; S.underEdit = false; lastPropsKey = ""; commit(); };
   const set = fn => { pushHist(); items.forEach(fn); commit(); };
+  if ($("image_width")) $("image_width").onchange = e => {
+    const w=+e.target.value;
+    if (!Number.isFinite(w) || w < 20 || w > 10000) { e.target.value=items[0].w; return; }
+    set(i => { i.h *= w/i.w; i.w=w; });
+  };
   const on = (id, ev, fn) => { const n = $(id); if (n) n.addEventListener(ev, fn); };
   document.querySelectorAll("#side .seg").forEach(sg => sg.querySelectorAll("button").forEach(b => b.onclick = () => {
     const k = sg.dataset.key, v = b.dataset.v;
@@ -2172,7 +2191,7 @@ function zoomFit(maxZoom = 4) {
   const pts = [];
   for (const p of buildPrims()) {
     if (p.k === "ellipse") pts.push({ x: p.cx - p.rx, y: p.cy - p.ry }, { x: p.cx + p.rx, y: p.cy + p.ry });
-    else if (p.k === "rect") pts.push({ x: p.x, y: p.y }, { x: p.x + p.w, y: p.y + p.h });
+    else if (p.k === "rect" || p.k === "image") pts.push({ x: p.x, y: p.y }, { x: p.x + p.w, y: p.y + p.h });
     else if (p.k === "path") pts.push(...samplePts(p.cmds));
     else if (p.k === "text") { const b = layout(p.s, p.size, p.ha, p.va).box; pts.push({ x: p.x + b.x, y: p.y + b.y }, { x: p.x + b.x + b.w, y: p.y + b.y + b.h }); }
   }
@@ -2202,6 +2221,27 @@ wrap.addEventListener("wheel", ev => {
 let gestZoom = 1;   // Safari のピンチ
 wrap.addEventListener("gesturestart", ev => { ev.preventDefault(); gestZoom = S.zoom; });
 wrap.addEventListener("gesturechange", ev => { ev.preventDefault(); setZoom(gestZoom * ev.scale, ev.clientX, ev.clientY); });
+
+// ------------------------------------------------------------------ 書き出しに含める画像
+$("b_image").onclick = () => $("f_image").click();
+$("f_image").onchange = async e => {
+  const file=e.target.files[0]; e.target.value=""; if (!file) return;
+  const doc=S.doc, button=$("b_image"); button.disabled=true;
+  try {
+    const im=await readPlacedImage(file);
+    if (S.doc !== doc) { toast("図が切り替わったため、画像を配置しませんでした。もう一度選んでください。"); return; }
+    if (S.editing != null) closeEditor(true);
+    setTool("select");
+    const k=Math.min(1,600/im.w,500/im.h,wrap.clientWidth*0.7/S.zoom/im.w,wrap.clientHeight*0.7/S.zoom/im.h);
+    const w=im.w*k,h=im.h*k;
+    const x=Math.max(0,(wrap.scrollLeft+wrap.clientWidth/2)/S.zoom-w/2), y=Math.max(0,(wrap.scrollTop+wrap.clientHeight/2)/S.zoom-h/2);
+    pushHist();
+    const item={id:S.doc.nextId++,type:"image",name:file.name,src:im.src,x,y,w,h};
+    S.doc.items.push(item); S.sel=[item.id]; S.underEdit=false; commit();
+    toast("画像を配置しました。ドラッグで移動、角で大きさを変更できます");
+  } catch (err) { toast(err.message || "画像を読み込めませんでした"); }
+  finally { button.disabled=false; }
+};
 
 // ------------------------------------------------------------------ 下絵
 function loadImage(file) {   // 長い辺を 1568px までに縮めた JPEG にする(保存する図が重くなりすぎないように)
