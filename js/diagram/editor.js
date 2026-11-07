@@ -1,3 +1,4 @@
+import { paintOrder, reorderedItems } from "./stacking.mjs";
 import { imagePrimitive, resizeImage, readPlacedImage } from "./placed-image.mjs";
 import { toast, esc } from "../ui.js";
 import { snapToGuides } from "./snap.mjs";
@@ -562,7 +563,17 @@ function textAlign(s) {   // 文字の寄せ方(横, 縦)。決めていなけ�
 }
 function buildPrims() {
   const out = [];
-  for (const s of shapes()) {
+  for (const s of paintOrder(S.doc)) {
+    if (!isShape(s)) {
+      const e = s;
+      if (!edgeOk(e)) continue;
+      const g = edgeGeom(e);
+      out.push({ k: "path", cmds: g.cmds, lw: e.lw, dash: !!e.dash });
+      if (e.arrow !== "none") out.push(headPrim(e, g.end, g.endFrom));
+      if (e.arrow === "both") out.push(headPrim(e, g.start, g.startFrom));
+      if (e.label) out.push({ k: "text", x: g.label.x, y: g.label.y, s: e.label, size: e.fontSize, ha: "center", va: "center", styles: e.textStyles, src: e.id });
+      continue;
+    }
     if (s.type === "image") { const p = imagePrimitive(s); if (p) out.push(p); continue; }
     if (hiddenDot(s)) continue;               // 分岐していない所の ● は書き出さない
     const c = ctr(s), base = { lw: s.lw, dash: !!s.dash, fill: s.fill === "none" ? null : s.fill };
@@ -581,14 +592,6 @@ function buildPrims() {
       const y = va === "top" ? s.y + iy : va === "bottom" ? s.y + s.h - iy : c.y;
       out.push({ k: "text", x, y, s: s.text, size: s.fontSize, ha: al, va: va === "middle" ? "center" : va, styles: s.textStyles, src: s.id });
     }
-  }
-  for (const e of edges()) {
-    if (!edgeOk(e)) continue;
-    const g = edgeGeom(e);
-    out.push({ k: "path", cmds: g.cmds, lw: e.lw, dash: !!e.dash });
-    if (e.arrow !== "none") out.push(headPrim(e, g.end, g.endFrom));
-    if (e.arrow === "both") out.push(headPrim(e, g.start, g.startFrom));
-    if (e.label) out.push({ k: "text", x: g.label.x, y: g.label.y, s: e.label, size: e.fontSize, ha: "center", va: "center", styles: e.textStyles, src: e.id });
   }
   // 白い端子はすべての配線の後に描き、線を内側へ透かさない。
   const whiteTerminals = [];
@@ -811,15 +814,17 @@ function labelBox(e, g) {
   return { x: g.label.x + b.x - 4, y: g.label.y + b.y - 2, w: b.w + 8, h: b.h + 4 };
 }
 function hitTest(p) {
-  const es = edges().filter(edgeOk);
-  for (let i = es.length - 1; i >= 0; i--) {
-    const e = es[i], g = edgeGeom(e);
+  const order = paintOrder(S.doc), shape = shapeAt(p);
+  for (let i = order.length - 1; i >= 0; i--) {
+    const e = order[i];
+    if (isShape(e)) { if (e === shape) return { item: e }; continue; }
+    if (!edgeOk(e)) continue;
+    const g = edgeGeom(e);
     if (e.label) { const b = labelBox(e, g); if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return { item: e, label: true }; }
     const pts = samplePts(g.cmds);
     for (let j = 1; j < pts.length; j++) if (distSeg(p, pts[j - 1], pts[j]) < px(6)) return { item: e };
   }
-  const s = shapeAt(p);
-  return s ? { item: s } : null;
+  return null;
 }
 function handleAt(p) {
   if (S.sel.length !== 1) return null;
@@ -2186,10 +2191,6 @@ function sideHTML(items) {
   h += `<div class="sec"><h4>線の種類</h4>${seg("dash", [["0", sicon("solid"), "実線"], ["1", sicon("dash"), "点線"]], items.every(i => i.dash) ? "1" : items.every(i => !i.dash) ? "0" : "")}</div>`;
   if (shapesSel.length) {
     h += `<div class="sec"><h4>塗り</h4>${seg("fill", [["#ffffff", "白でぬる"], ["none", "なし(透明)"]], shapesSel.every(i => i.fill === "none") ? "none" : shapesSel.every(i => i.fill !== "none") ? "#ffffff" : "")}</div>`;
-    const k = navigator.platform.includes("Mac") ? "⌘" : "Ctrl+";
-    h += `<div class="sec"><h4>重なりの順番</h4><div class="grid2">
-      <button class="btn" data-stack="front" title="いちばん前に出す(${k}Shift+])">⇈ 最前面へ</button><button class="btn" data-stack="up" title="1 つ前に出す(${k}])">↑ 1 つ前へ</button>
-      <button class="btn" data-stack="back" title="いちばん後ろに下げる(${k}Shift+[)">⇊ 最背面へ</button><button class="btn" data-stack="down" title="1 つ後ろに下げる(${k}[)">↓ 1 つ後ろへ</button></div></div>`;
     if (shapesSel.every(i => i.type === "trap")) {
       const dir = same("trapDir") || "", ins = shapesSel.every(i => (i.inset ?? 0.2) === (one.inset ?? 0.2)) ? one.inset ?? 0.2 : 0.2;
       h += `<div class="sec"><h4>短い辺</h4>${seg("trapdir", [["top", "上"], ["bottom", "下"], ["left", "左"], ["right", "右"]], dir)}
@@ -2203,6 +2204,10 @@ function sideHTML(items) {
       h += `<div class="sec"><h4>ゲートの種類</h4><select id="p_gate" style="width:100%">${Object.entries(GATE_NAMES).map(([v, l]) => `<option value="${v}" ${v === one.kind ? "selected" : ""}>${l}</option>`).join("")}</select></div>`
          + (["not", "buf", "dff"].includes(one.kind) ? "" : `<div class="sec"><h4>入力の数</h4><div class="stepper"><button id="nin_minus" title="入力を 1 本減らす">−</button><input type="number" id="p_nin" min="2" max="8" value="${gateIns(one)}"><button id="nin_plus" title="入力を 1 本増やす">＋</button></div></div>`);
   }
+  const k = navigator.platform.includes("Mac") ? "⌘" : "Ctrl+";
+  h += `<div class="sec"><h4>重なりの順番</h4><div class="grid2">
+    <button class="btn" data-stack="front" title="いちばん前に出す(${k}Shift+])">⇈ 最前面へ</button><button class="btn" data-stack="up" title="1 つ前に出す(${k}])">↑ 1 つ前へ</button>
+    <button class="btn" data-stack="back" title="いちばん後ろに下げる(${k}Shift+[)">⇊ 最背面へ</button><button class="btn" data-stack="down" title="1 つ後ろに下げる(${k}[)">↓ 1 つ後ろへ</button></div></div>`;
   if (edgesSel.length && !edgesSel.some(isWire)) {
     const arrows = edgesSel.every(e => e.arrow === edgesSel[0].arrow) ? edgesSel[0].arrow : "";
     h += `<div class="sec"><h4>矢印</h4>${seg("arrow", [["none", sicon("arrowNone"), "矢印なし"], ["end", sicon("arrowEnd"), "終点に矢印"], ["both", sicon("arrowBoth"), "両端に矢印"]], arrows)}`;
@@ -2232,32 +2237,22 @@ function sideHTML(items) {
   h += `<div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   return h;
 }
-// 図形の重なりの順番を変える(線・矢印はいつも図形より前に描く)。
-// 1 つずつ動かすときは、重なっている図形を 1 つ越えるまで動かす(重なっていない図形と入れ替えても見た目が変わらないため)
+// 描画と選択に共通の順番で、図形と線を一緒に並べ替える。
 function restack(mode) {
-  const sel = new Set(selItems().filter(isShape));
-  if (!sel.size) return;
-  const all = S.doc.items, pos = all.map((it, k) => isShape(it) ? k : -1).filter(k => k >= 0);
-  let order = pos.map(k => all[k]);
-  if (mode === "front") order = [...order.filter(i => !sel.has(i)), ...order.filter(i => sel.has(i))];
-  else if (mode === "back") order = [...order.filter(i => sel.has(i)), ...order.filter(i => !sel.has(i))];
-  else {
-    const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-    const up = mode === "up";
-    if (!up) order.reverse();
-    for (let j = order.length - 1; j >= 0; j--) {        // 前の方にあるものから動かす
-      const it = order[j];
-      if (!sel.has(it)) continue;
-      let t = j + 1;
-      while (t < order.length && (sel.has(order[t]) || !hit(it, order[t]))) t++;
-      if (t >= order.length) continue;
-      order.splice(j, 1); order.splice(t, 0, it);
-    }
-    if (!up) order.reverse();
-  }
-  if (order.every((it, j) => all[pos[j]] === it)) return;   // もう端にある
+  const selected = selItems();
+  if (!selected.length) return;
+  const bounds = it => {
+    if (isShape(it)) return it;
+    if (!edgeOk(it)) return null;
+    const pts = samplePts(edgeGeom(it).cmds), pad = Math.max(it.lw || 1, 1) / 2;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const x = Math.min(...xs) - pad, y = Math.min(...ys) - pad;
+    return { x, y, w: Math.max(...xs) + pad - x, h: Math.max(...ys) + pad - y };
+  };
+  const before = paintOrder(S.doc), order = reorderedItems(S.doc, selected.map(i => i.id), mode, bounds);
+  if (order.every((it, i) => it === before[i])) return;
   pushHist();
-  const next = all.slice(); pos.forEach((k, j) => next[k] = order[j]); S.doc.items = next;
+  S.doc.items = order; S.doc.itemStack = 1;
   commit();
 }
 function alignShapes(mode) {
