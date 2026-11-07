@@ -1,3 +1,5 @@
+import { containsCell, selectionAxis } from "./range.mjs";
+
 // Excel / CSV を読み込んで、表 { columns: [名前], rows: [[値]], numeric: [数値の列か] } にする。
 // 値は 数値 / 文字列 / null(空)。
 
@@ -149,16 +151,25 @@ export function colLetter(c) {
   for (c += 1; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + (c - 1) % 26) + s;
   return s;
 }
-export const rangeLabel = r => `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
+export const rangeLabel = r => {
+  if (r.areas) return r.areas.map(rangeLabel).join(", ");
+  const box = `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
+  const parts = [];
+  const shorten = values => values.length > 8 ? `${values.slice(0, 8).join(", ")} ほか${values.length - 8}件` : values.join(", ");
+  if (Array.isArray(r.cols)) parts.push(`列 ${shorten(r.cols.map(colLetter))}`);
+  if (Array.isArray(r.rows)) parts.push(`行 ${shorten(r.rows.map(i => i + 1))}`);
+  return box + (parts.length ? `（${parts.join("・")}）` : "");
+};
 
-// range = { r0, c0, r1, c1, header }(0 から数える。header = 1 行目を列の名前にするか)
+// range = { r0, c0, r1, c1, header, rows?, cols? }。行・列の配列がある場合はその番号だけを使う。
+// 0 から数える。header = 選んだ最初の行を列の名前にするか。
 export function tableFromRange(rows, range) {
-  const part = [];
-  for (let r = range.r0; r <= range.r1; r++) {
+  const part = [], selectedRows = selectionAxis(range, "rows"), selectedCols = selectionAxis(range, "cols");
+  for (const r of selectedRows) {
     const row = rows[r] || [];
-    part.push(Array.from({ length: range.c1 - range.c0 + 1 }, (_, k) => row[range.c0 + k] ?? null));
+    part.push(selectedCols.map(c => containsCell(range, r, c) ? row[c] ?? null : null));
   }
-  const name = k => `列${colLetter(range.c0 + k)}`;
+  const name = k => `列${colLetter(selectedCols[k])}`;
   if (!range.header) part.unshift(part[0] ? part[0].map((_, k) => name(k)) : []);
   return clean(part, name);
 }

@@ -200,3 +200,42 @@ svg#svg { display: block; user-select: none; }
 
 /* 確認・キャンセルをスクロール中も表示する。 */
 .sketch-dialog .acts { position: sticky; bottom: -18px; z-index: 1; margin: var(--space-3) -20px -18px; padding: var(--space-3) 20px; background: var(--surface); border-top: 1px solid var(--line); }
+
+.sketch-mode { margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius); }
+.sketch-mode legend { font-weight: 600; font-size: var(--text-ui); }
+.sketch-mode label { display: inline-flex; align-items: center; gap: var(--space-1); margin-right: var(--space-4); }
+.sketch-mode .sketch-note { margin: var(--space-2) 0 0; }
+.sketch-mode .sketch-changes { margin: var(--space-2) 0 0; overflow-wrap: anywhere; }
+
+#main .sketch-entry { height: auto; min-height: 40px; padding: 4px 10px; gap: 6px; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent); text-align: left; }
+#main .sketch-entry:hover { background: var(--surface-soft); }
+.sketch-entry span { display: flex; flex-direction: column; line-height: 1.2; }
+.sketch-entry small { color: var(--muted); font-size: 10px; font-weight: 400; margin-top: 2px; }
+.sketch-steps { margin: var(--space-2) 0 var(--space-3); padding-left: 1.5em; font-size: var(--text-ui); }
+
+.canvas-heading .sketch-entry { margin-left: auto; flex-shrink: 0; }
+.canvas-heading .sketch-entry span { color: var(--accent); line-height: 1.2; }
+@media (max-width: 700px) { .canvas-heading .canvas-instruction { display: none; } .canvas-heading .sketch-entry span { display: flex; } }
+
+.sketch-tidy-options { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; }
+.sketch-tidy-options[hidden] { display: none; }
+.sketch-tidy-options label { margin-right: 0; font-size: 13px; }
+
+@media (min-width: 701px) { .tool-categories { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+#side:has(#c_name) label { display: block; margin-bottom: 8px; }
+#side:has(#c_name) input:not([type="checkbox"]) { display: block; width: 100%; box-sizing: border-box; }
+
+@media (min-width: 701px) { .tool-categories button { font-size: 12px; } }
+
+/* 電源の種類を途中で折り返さずに選べるようにする */
+@media (min-width: 701px) {
+  #palette .gates[data-group="circuit"] { grid-template-columns: 1fr; }
+}
+
+/* 種類が増えても、選択中の分類をコンパクトに表示する */
+.tool-category { display: flex; align-items: center; gap: 4px; margin: 0 8px; padding: 4px 0; }
+.tool-category label { flex: none; font-size: 14px; color: var(--muted); }
+.tool-category select { min-width: 0; flex: 1; padding: 4px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 14px; }
+.tool-category select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 700px) { .tool-category { margin: 0 4px; flex-wrap: wrap; } .tool-category select { width: 100%; } }

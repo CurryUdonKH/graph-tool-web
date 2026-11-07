@@ -257,3 +257,18 @@ details.gear > div { padding: var(--size-8px) 0 var(--size-2px); }
 .file-card > summary:hover { background: var(--surface); }
 .file-settings { padding: 8px 4px 12px; }
 .scatter-heading span, .plot-heading span, #tab_body .sub, #tab_body details.gear summary { line-height: 1.5; }
+
+/* 元のシートの列・行見出し。ボタンでキーボードとタッチにも対応する。 */
+.rawgrid .raw-header { display: block; width: 100%; min-width: 36px; min-height: 32px; padding: 4px 8px; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.rawgrid th.ch, .rawgrid th.rn { padding: 0; text-align: center; }
+.rawgrid .raw-header:hover, .rawgrid .raw-header[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.rawgrid .raw-header:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rawbar input[type="text"] { width: 150px; max-width: 100%; }
+#raw_address_error { color: var(--muted); }
+
+.rawgrid { outline: none; }
+.rawgrid td.active-cell { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rawgrid:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.rawgrid .raw-all { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 6px; }
+.rawgrid th.rn { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.rawbar input#raw_address { width: 260px; }

@@ -3,6 +3,9 @@ import { toast, esc } from "../ui.js";
 import { snapToGuides } from "./snap.mjs";
 import { isWire, migrateWireTypes } from "./wiretypes.mjs";
 import { remapStyles } from "./textstyles.mjs";
+import { hasTerminal, terminalMode, splitTerminalMode, terminalPrimitives } from "./terminal-marks.mjs";
+import { circuitPins, circuitPrimitives, circuitRouteConflict, circuitPathCrossesBody, splitCircuitPoints, CIRCUIT_TYPES } from "./circuit-model.mjs";
+import { circuitDoubleClick } from "./circuit-interaction.mjs";
 // 図の作成エディタ(ブラウザ版)
 // 楕円・四角・注釈・文字と、直線/曲線/直角の矢印、論理ゲート・配線・接続点をマウスで置く。
 // 手元版(Streamlit のカスタムコンポーネント)の描画・操作をそのまま使い、
@@ -21,6 +24,9 @@ const TOOLS = [
   ["note", "▤ 注釈", "N", "説明を書く枠。クリックで置き、「直線」ツールで指し示す線を引けます。"],
   ["text", "A 文字", "T", "枠のない文字。クリックで置く。"],
   ["dot", "● 接続点", "", "配線が分かれる所に置く黒い点。クリックした所のグリッドの点に置きます。点から線を引いたり、線の端を点につないだりできます。"],
+  ["circuit", "回路部品", "", "クリックで部品を置きます。"],
+  ["circuit-junction", "接続点", "", "配線の分岐点を置きます。"],
+  ["circuit-wire", "回路配線", "", "端子・接続点・空白をクリックして配線します。交差は接続されません。"],
   ["gate", "", "G", "クリックで論理ゲートを置く。入力は左の辺、出力は右の辺につなぎます(線の端がグリッドの点に合います)。"],
   ["straight", "→ 直線", "L", "図形から図形へドラッグ。同じ図形の上で離すと自分に戻る矢印(ループ)になります。"],
   ["curve", "⤻ 曲線", "C", "図形から図形へドラッグ。選ぶと出る真ん中の ● で全体のふくらみ、◇ でその側の曲がり方を変えられます(両端は動きません)。両端の ○ は図形から離して置くこともできます。同じ図形の上で離すと、自分に戻る矢印になります。"],
@@ -34,6 +40,8 @@ const DEF = {
   poly:    { w: 120, h: 120, text: "", fontSize: 22, lw: 2, fill: "#ffffff", sides: 6 },
   note:    { w: 240, h: 80, text: "注釈", fontSize: 18, lw: 1, fill: "#ffffff" },
   text:    { w: 120, h: 40, text: "文字", fontSize: 18, lw: 1, fill: "none" },
+  circuit: { w: 120, h: 80, text: "", fontSize: 16, lw: 1.5, fill: "none" },
+  "circuit-junction": { w: 10, h: 10, text: "", fontSize: 16, lw: 1.5, fill: "#000000" },
   gate:    { w: 120, h: 80, text: "", fontSize: 16, lw: 1.5, fill: "#ffffff" },
   dot:     { w: 10, h: 10, text: "", fontSize: 12, lw: 1, fill: "#000000" },
 };
@@ -180,6 +188,7 @@ function refPt(end) {
   if (end.id == null) return { x: end.x, y: end.y };
   const s = get(end.id);
   if (!s) return { x: end.x || 0, y: end.y || 0 };
+  if (s.type === "circuit" && end.pin) return circuitPins({ ...s, type: s.kind, ...ctr(s) })[end.pin] || ctr(s);
   if (end.ang != null) return angPt(s, end.ang);
   if (s.type === "ellipse" || end.ax == null) return ctr(s);
   return { x: s.x + end.ax * s.w, y: s.y + end.ay * s.h };
@@ -214,6 +223,8 @@ function attach(end, toward) {
   if (end.id == null) return { x: end.x, y: end.y };
   const s = get(end.id);
   if (!s) return { x: end.x || 0, y: end.y || 0 };
+  if (s.type === "circuit" && end.pin) return refPt(end);
+  if (s.type === "circuit-junction") return ctr(s);
   if (s.type === "dot") return ctr(s);   // 接続点・曲がり角では、線を点の中心まで伸ばす(すき間を作らない)
   if (s.type === "gate" && end.ax != null) return { x: s.x + end.ax * s.w, y: s.y + end.ay * s.h };   // 端子はその位置そのもの
   if (end.ang != null || (s.type !== "ellipse" && end.ax != null)) {
@@ -422,6 +433,8 @@ const headPrim = (e, tip, from) => ({ k: "path", cmds: headCmds(tip, from, e.lw,
 
 // ------------------------------------------------------------------ 論理ゲートの形
 // 右向き。入力は左の辺(2 入力なら高さの 1/4 と 3/4、1 入力なら真ん中)、出力は右の辺の真ん中。
+const circuitCenter = s => ctr(s);
+const CIRCUIT_NAMES = { resistor: "抵抗", variable_resistor: "可変抵抗（2端子）", capacitor: "コンデンサ", inductor: "コイル", diode: "ダイオード", current_source: "電流源", voltage_dc: "直流電源", voltage_ac: "交流電源", ground: "接地", voltage: "従来の電圧源" };
 const GATE_NAMES = { and: "AND", or: "OR", not: "NOT", nand: "NAND", nor: "NOR", xor: "XOR", xnor: "XNOR", buf: "バッファ", dff: "D-FF" };
 // D フリップフロップの端子(図形の左上からの割合):左 d・clock、右 q、上 set、下 reset
 // 高さを 3 等分した所に d・q と clock を置く(標準 80×120 = グリッド 4×6 マスで、端子がすべてグリッドに乗る)
@@ -555,6 +568,8 @@ function buildPrims() {
     const c = ctr(s), base = { lw: s.lw, dash: !!s.dash, fill: s.fill === "none" ? null : s.fill };
     if (s.type === "ellipse" || s.type === "dot") out.push({ k: "ellipse", cx: c.x, cy: c.y, rx: s.w / 2, ry: s.h / 2, ...base });
     else if (s.type === "gate") out.push(...gatePrims(s));
+    else if (s.type === "circuit") out.push(...circuitPrimitives({ ...s, type: s.kind, ...circuitCenter(s) }));
+    else if (s.type === "circuit-junction") out.push({ k: "ellipse", cx: c.x, cy: c.y, rx: 4, ry: 4, lw: s.lw, fill: "#000000" });
     else if (isPoly(s)) out.push({ k: "path", cmds: [...shapePoly(s).map((q, i) => [i ? "L" : "M", q.x, q.y]), ["Z"]], ...base });
     else if (s.type !== "text") out.push({ k: "rect", x: s.x, y: s.y, w: s.w, h: s.h, ...base });
     if (s.text) {
@@ -574,6 +589,19 @@ function buildPrims() {
     if (e.arrow !== "none") out.push(headPrim(e, g.end, g.endFrom));
     if (e.arrow === "both") out.push(headPrim(e, g.start, g.startFrom));
     if (e.label) out.push({ k: "text", x: g.label.x, y: g.label.y, s: e.label, size: e.fontSize, ha: "center", va: "center", styles: e.textStyles, src: e.id });
+  }
+  // 白い端子はすべての配線の後に描き、線を内側へ透かさない。
+  const whiteTerminals = [];
+  for (const e of edges()) {
+    if (!(isWire(e) || e.circuitWire) || !edgeOk(e)) continue;
+    const g = edgeGeom(e), marks = terminalPrimitives(e.terminalEnds, g.start, g.end, e.lw, [e.from, e.to]);
+    whiteTerminals.push(...marks); out.push(...marks);
+  }
+  // 白丸と黒い接続点が重なっても、実際の接続点は黒く表示する。
+  for (const s of shapes().filter(o => o.type === "circuit-junction" || (o.type === "dot" && !hiddenDot(o)))) {
+    const c = ctr(s);
+    if (whiteTerminals.some(p => dist(c, { x: p.cx, y: p.cy }) < 0.5))
+      out.push({ k: "ellipse", cx: c.x, cy: c.y, rx: s.type === "dot" ? s.w / 2 : 4, ry: s.type === "dot" ? s.h / 2 : 4, lw: s.lw, fill: "#000000" });
   }
   // 端子の位置での分岐点:くっついて重なった端子どうしも 1 本のつながりとして数え、3 つ以上つながっていれば ● を描く
   const key = q => `${Math.round(q.x)},${Math.round(q.y)}`, spots = new Map();
@@ -671,7 +699,7 @@ function drawOverlay() {
   for (const it of selItems()) {
     if (isShape(it)) {
       el("rect", { x: it.x - 3, y: it.y - 3, width: it.w + 6, height: it.h + 6, fill: "none", stroke: A, "stroke-width": 1, "stroke-dasharray": "4 3" });
-      if (it === one) for (const h of cornerHandles(it)) el("rect", { x: h.x - px(5), y: h.y - px(5), width: px(10), height: px(10), fill: "#fff", stroke: A, "stroke-width": px(1.5) });
+      if (it === one && !["circuit", "circuit-junction"].includes(it.type)) for (const h of cornerHandles(it)) el("rect", { x: h.x - px(5), y: h.y - px(5), width: px(10), height: px(10), fill: "#fff", stroke: A, "stroke-width": px(1.5) });
     } else if (edgeOk(it)) {
       const g = edgeGeom(it);
       el("path", { d: dStr(g.cmds), fill: "none", stroke: A, "stroke-width": it.lw + 5, opacity: .25 });
@@ -681,7 +709,7 @@ function drawOverlay() {
           el("line", { x1: g.start.x, y1: g.start.y, x2: g.c1.x, y2: g.c1.y, stroke: A, "stroke-width": px(1), "stroke-dasharray": dsh });
           el("line", { x1: g.end.x, y1: g.end.y, x2: g.c2.x, y2: g.c2.y, stroke: A, "stroke-width": px(1), "stroke-dasharray": dsh });
         }
-        for (const h of g.handles) {
+        for (const h of (it.circuitWire ? [] : g.handles)) {
           if (h.k === "c1" || h.k === "c2") { const r = px(6); el("path", { d: `M${h.x} ${h.y - r}L${h.x + r} ${h.y}L${h.x} ${h.y + r}L${h.x - r} ${h.y}Z`, fill: "#fff", stroke: A, "stroke-width": px(1.5) }); }
           else el("circle", { cx: h.x, cy: h.y, r: px(6), fill: h.k === "start" || h.k === "end" ? "#fff" : A, stroke: A, "stroke-width": px(1.5) });
         }
@@ -701,6 +729,23 @@ function drawOverlay() {
     const to = endpointAt(S.mouse), a = attach(S.drag.from, refPt(to)), b = attach(to, refPt(S.drag.from));
     el("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: A, "stroke-width": 2, "stroke-dasharray": "5 4" });
     hoverRing(to);
+  }
+  if (S.circuitDraft) {
+    const d = S.circuitDraft, target = S.circuitFree ? null : circuitEndAt(S.mouse), a = refPt(d.from), b = target ? refPt(target) : snapP(S.mouse);
+    const fixed = [a, ...d.pts], last = fixed[fixed.length - 1], dir = target && pinDir(target);
+    const tail = !target ? [orth(last, S.mouse)] : [...route(last, b, null, dir ? dir.x !== 0 : null), b];
+    el("polyline", { points: [...fixed, ...tail].map(p => `${p.x},${p.y}`).join(" "), fill: "none", stroke: A, "stroke-width": px(2), "stroke-dasharray": `${px(5)} ${px(4)}` });
+  }
+  if (S.tool === "circuit-wire") {
+    const target = S.circuitFree ? null : circuitEndAt(S.mouse);
+    const branch = !S.circuitDraft && !target && !S.circuitFree ? circuitWireAt(S.mouse) : null;
+    const q = target ? refPt(target) : branch ? branch.q : S.circuitDraft ? orth([refPt(S.circuitDraft.from), ...S.circuitDraft.pts].at(-1), S.mouse) : snapP(S.mouse);
+    el("circle", { cx: q.x, cy: q.y, r: px(target || branch ? 9 : 5), fill: "none", stroke: branch?.ambiguous ? "#b43e3e" : "#1b8b69", "stroke-width": px(2) });
+    if (branch && !branch.ambiguous) el("circle", { cx: q.x, cy: q.y, r: px(3), fill: "#1b8b69", stroke: "none" });
+  }
+  if (S.tool === "circuit-wire" || (one && one.type === "circuit")) {
+    for (const sh of shapes().filter(o => o.type === "circuit")) for (const q of Object.values(circuitPins({ ...sh, type: sh.kind, ...circuitCenter(sh) })))
+      el("circle", { cx: q.x, cy: q.y, r: px(4), fill: "#fff", stroke: "#1b8b69", "stroke-width": px(1.5) });
   }
   if (S.wdraft) {
     const pts = wirePts(), tg = wireTarget(S.mouse);
@@ -780,6 +825,8 @@ function handleAt(p) {
   if (S.sel.length !== 1) return null;
   const it = get(S.sel[0]);
   if (!it) return null;
+  if (isShape(it) && ["circuit", "circuit-junction"].includes(it.type)) return null;
+  if (it.circuitWire) return null;
   if (isShape(it)) { const h = cornerHandles(it).find(h => dist(h, p) < px(8)); return h ? { ...h, item: it } : null; }
   if (!edgeOk(it)) return null;
   const g = edgeGeom(it);
@@ -793,7 +840,7 @@ function handleAt(p) {
 function pushHist() { S.hist.push(JSON.stringify(S.doc)); if (S.hist.length > 200) S.hist.shift(); S.fut = []; }
 function undo() { if (!S.hist.length) return; S.fut.push(JSON.stringify(S.doc)); S.doc = JSON.parse(S.hist.pop()); afterJump(); }
 function redo() { if (!S.fut.length) return; S.hist.push(JSON.stringify(S.doc)); S.doc = JSON.parse(S.fut.pop()); afterJump(); }
-function afterJump() { S.sel = S.sel.filter(get); render(); push(); }
+function afterJump() { S.sel = S.sel.filter(get); S.circuitLastGood = JSON.stringify(S.doc); S.circuitError = ""; render(); push(); }
 // 直角線(配線)が斜めにならないように直す。両端の近くの曲がり角をずらし、それでもだめなら引き直す
 const aligned = (a, b) => Math.abs(a.x - b.x) < 0.5 || Math.abs(a.y - b.y) < 0.5;
 function detachWireEnds() {   // 配線の端が文字・四角・楕円などにつながっていたら、その場の点として外す
@@ -822,8 +869,9 @@ function autoAttach() {   // 見た目でつながっている端(● の中心�
     }
   }
 }
-function normalizeWires(clean) {
+function normalizeWires(clean, skipCircuit = false) {
   for (const e of edges()) {
+    if (skipCircuit && e.circuitWire) continue;
     if (e.style !== "elbow" || !edgeOk(e)) continue;
     const a = refPt(e.from), b = refPt(e.to), c = (e.points || []).map(o => ({ ...o }));
     const all = () => [a, ...c, b];
@@ -854,7 +902,7 @@ function restructureWires() {
                         S.doc.items.unshift(d); return d; };
   const at = d => ({ id: d.id, ax: 0.5, ay: 0.5 });
   const piece = (src, from, to) => ({ id: S.doc.nextId++, type: "edge", style: "elbow", from, to, points: [], label: "",
-                                     fontSize: src.fontSize, lw: src.lw, arrow: "none", dash: !!src.dash, wire: true });
+                                     fontSize: src.fontSize, lw: src.lw, arrow: "none", dash: !!src.dash, wire: true, ...(src.terminalEnds === "auto" ? { terminalEnds: "auto" } : {}) });
   const removeItem = it => { S.doc.items = S.doc.items.filter(x => x !== it); };
   const attachedTo = id => edges().filter(e => e.from.id === id || e.to.id === id);
   for (let guard = 0; guard < 200; guard++) {
@@ -863,9 +911,11 @@ function restructureWires() {
     for (const e of edges()) {
       if (!isWire(e) || !edgeOk(e) || !(e.points && e.points.length)) continue;
       const dots = e.points.map(c => dotAt(c) || newDot(c)), to0 = e.to;
+      const [firstMarks, lastMarks] = splitTerminalMode(e.terminalEnds);
+      e.terminalEnds = firstMarks;
       e.points = []; e.wire = true; e.to = at(dots[0]);
       for (let k = 1; k < dots.length; k++) S.doc.items.push(piece(e, at(dots[k - 1]), at(dots[k])));
-      S.doc.items.push(piece(e, at(dots[dots.length - 1]), to0));
+      const last = piece(e, at(dots[dots.length - 1]), to0); last.terminalEnds = lastMarks; S.doc.items.push(last);
       changed = true; break;
     }
     if (changed) continue;
@@ -933,12 +983,16 @@ function restructureWires() {
         removeItem(d); changed = true; break;
       }
       if (es.length === 2 && es.every(e => isWire(e) && !(e.points && e.points.length)) &&
-          es[0].lw === es[1].lw && !!es[0].dash === !!es[1].dash) {
+          es[0].lw === es[1].lw && !!es[0].dash === !!es[1].dash && (es[0].terminalEnds === "auto") === (es[1].terminalEnds === "auto")) {
         const far = e => e.from.id === d.id ? e.to : e.from, o1 = refPt(far(es[0])), o2 = refPt(far(es[1]));
         const vert = Math.abs(o1.x - c.x) < 0.5 && Math.abs(o2.x - c.x) < 0.5 && (o1.y - c.y) * (o2.y - c.y) < 0;
         const horiz = Math.abs(o1.y - c.y) < 0.5 && Math.abs(o2.y - c.y) < 0.5 && (o1.x - c.x) * (o2.x - c.x) < 0;
-        if (vert || horiz) {
-          const [e1, e2] = es;
+        const atDot = e => e.from.id === d.id ? "start" : "end";
+        if ((vert || horiz) && !es.some(e => hasTerminal(e.terminalEnds, atDot(e)))) {
+          const [e1, e2] = es, changing = atDot(e1), otherFar = atDot(e2) === "start" ? "end" : "start";
+          const fromMark = changing === "start" ? hasTerminal(e2.terminalEnds, otherFar) : hasTerminal(e1.terminalEnds, "start");
+          const toMark = changing === "end" ? hasTerminal(e2.terminalEnds, otherFar) : hasTerminal(e1.terminalEnds, "end");
+          e1.terminalEnds = e1.terminalEnds === "auto" && e2.terminalEnds === "auto" ? "auto" : terminalMode(fromMark, toMark);
           if (e1.from.id === d.id) e1.from = { ...far(e2) }; else e1.to = { ...far(e2) };
           if (e2.label && !e1.label) e1.label = e2.label;
           removeItem(e2); removeItem(d); changed = true; break;
@@ -949,13 +1003,103 @@ function restructureWires() {
   }
   S.sel = S.sel.filter(get);
 }
-function commit() { detachWireEnds(); autoAttach(); normalizeWires(true); restructureWires(); render(); push(); }   // つなぎ直しは操作が終わったときだけ
+function circuitGeometryValid() {
+  const parts = shapes().filter(s => s.type === "circuit"), dots = shapes().filter(s => s.type === "circuit-junction");
+  const pins = parts.flatMap(s => Object.entries(circuitPins({ ...s, type: s.kind, ...circuitCenter(s) })).map(([pin, p]) => ({ ...p, id: s.id, pin })));
+  const nodes = [...pins, ...dots.map(s => ({ ...ctr(s), id: s.id }))];
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) if (dist(nodes[i], nodes[j]) < 0.5) return false;
+  if (edges().some(e => e.circuitWire && (e.style !== "elbow" || e.arrow !== "none" || e.wire || !edgeOk(e)))) return false;
+  const wires = edges().filter(e => e.circuitWire && edgeOk(e)).map(e => ({ points: edgeGeom(e).pts, ends: [e.from, e.to] }));
+  for (let i = 0; i < wires.length; i++) {
+    const w = wires[i];
+    if (!w.points || w.points.some((p, n) => n && (!aligned(p, w.points[n - 1]) || dist(p, w.points[n - 1]) < 0.5))) return false;
+    if (circuitRouteConflict(w.points, w.ends, wires.filter((_, n) => n !== i), nodes)) return false;
+    if (parts.some(part => circuitPathCrossesBody(w.points, part))) return false;
+  }
+  return true;
+}
+function commit() {
+  detachWireEnds(); autoAttach(); normalizeWires(true); restructureWires();
+  if (!circuitGeometryValid()) {
+    if (S.circuitLastGood) S.doc = JSON.parse(S.circuitLastGood);
+    S.circuitError = "配線や接続点が重なり、つながり方が曖昧になるため操作を取り消しました。";
+    render(); return;
+  }
+  S.circuitError = ""; S.circuitLastGood = JSON.stringify(S.doc); render(); push();
+}   // つなぎ直しは操作が終わったときだけ
 
 // ------------------------------------------------------------------ マウス
 const ptOf = ev => { const r = svg.getBoundingClientRect(); return { x: (ev.clientX - r.left) / S.zoom, y: (ev.clientY - r.top) / S.zoom }; };
 // ---- 配線:途中からの分岐と、縦横の自動ルート
 // 配線かどうか:「配線」で引いた線と、ゲートや接続点につながった矢印なしの直角線
 // 配線かどうか:「配線」で引いた線と、矢印のない直線・直角線(曲線や矢印つきの線は図形の縁につなぐ「矢印」扱い)
+function circuitEndAt(p) {
+  let best = null, bd = px(12);
+  for (const s of shapes()) {
+    if (s.type === "circuit-junction") {
+      const d = dist(p, ctr(s)); if (d < bd) { bd = d; best = { id: s.id }; }
+    } else if (s.type === "circuit") {
+      for (const [pin, q] of Object.entries(circuitPins({ ...s, type: s.kind, ...circuitCenter(s) }))) {
+        const d = dist(p, q); if (d < bd) { bd = d; best = { id: s.id, pin }; }
+      }
+    }
+  }
+  return best;
+}
+// 既存の回路配線の線分上にある、分岐の候補を探す。交差点は曖昧なので拒否する。
+function circuitWireAt(p) {
+  let best = null, bd = px(8);
+  for (const e of edges().filter(e => e.circuitWire && edgeOk(e))) {
+    const pts = edgeGeom(e).pts;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], d = distSeg(p, a, b);
+      if (d >= bd) continue;
+      const clamp = (n, x, y) => Math.max(Math.min(x, y), Math.min(Math.max(x, y), n));
+      const q = Math.abs(a.y - b.y) < 0.5 ? { x: clamp(snapV(p.x), a.x, b.x), y: a.y } : { x: a.x, y: clamp(snapV(p.y), a.y, b.y) };
+      best = { id: e.id, q }; bd = d;
+    }
+  }
+  if (!best) return null;
+  const n = edges().filter(e => e.circuitWire && edgeOk(e) && edgeGeom(e).pts.some((p, i, pts) => i && distSeg(best.q, pts[i - 1], p) < 1e-7)).length;
+  return n > 1 ? { ambiguous: true, q: best.q } : best;
+}
+// 明示的な分岐点を元の線に挿入し、外側の白丸と経路を保つ。
+function splitCircuitAt(e, q) {
+  const pts = edgeGeom(e).pts, atStart = dist(q, pts[0]) < 0.5, atEnd = dist(q, pts.at(-1)) < 0.5;
+  if ((atStart && e.from.id != null) || (atEnd && e.to.id != null)) throw new Error("部品の端子には接続点を重ねられません。");
+  const def = DEF["circuit-junction"], dot = { id: S.doc.nextId++, type: "circuit-junction", ...def, x: q.x - def.w / 2, y: q.y - def.h / 2 };
+  S.doc.items.push(dot);
+  if (atStart) e.from = { id: dot.id };
+  else if (atEnd) e.to = { id: dot.id };
+  else {
+    const to = e.to, [firstMarks, lastMarks] = splitTerminalMode(e.terminalEnds), { before, after } = splitCircuitPoints(pts, q);
+    const second = { ...e, id: S.doc.nextId++, from: { id: dot.id }, to, points: simplify(q, after.slice(1, -1), pts.at(-1)), terminalEnds: lastMarks, label: "" };
+    e.to = { id: dot.id }; e.points = simplify(pts[0], before.slice(1, -1), q); e.terminalEnds = firstMarks;
+    S.doc.items.push(second);
+  }
+  return { id: dot.id };
+}
+function finishCircuitWire(to) {
+  const d = S.circuitDraft, a = refPt(d.from), b = refPt(to);
+  const fixed = [a, ...d.pts], last = fixed[fixed.length - 1];
+  if (dist(last, b) < 0.5 && !d.pts.length) return false;
+  const dir = pinDir(to);
+  const points = simplify(a, [...d.pts, ...route(last, b, null, dir ? dir.x !== 0 : null)], b);
+  if (!points) { S.circuitError = "接続が曖昧にならない経路を見つけられません。位置を調整してください。"; render(); return false; }
+  const apply = () => {
+    const from = d.branch ? splitCircuitAt(get(d.branch.id), d.branch.q) : d.from;
+    const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from, to, points, label: "", fontSize: 16, lw: LINE_LW, arrow: "none", dash: false, wire: false, circuitWire: true, terminalEnds: "auto" };
+    S.doc.items.push(e); return e;
+  };
+  const before = JSON.stringify(S.doc);
+  let valid = false;
+  try { apply(); valid = circuitGeometryValid(); } catch (error) { S.circuitError = error.message; }
+  S.doc = JSON.parse(before);
+  if (!valid) { S.circuitError = "線や端子・部品に重なっています。分岐は接続点を置き、経路を変えるか Esc で取り消してください。"; render(); return false; }
+  pushHist(); const e = apply(); S.circuitDraft = null; S.sel = [e.id]; S.tool = "select";
+  if (lastDown) circuitCompleted = { ...lastDown, t: performance.now() };
+  commit(); return true;
+}
 function pinAt(p) {    // 「配線」の道具でつなげる所:論理ゲートの端子と接続点だけ(四角や楕円の縁には吸い付かない)
   let best = null, bd = px(12);
   for (const s of shapes()) {
@@ -1007,6 +1151,7 @@ function splitWire(hit) {   // 配線を hit.q で 2 本に分け、そこに接
   const dot = { id: S.doc.nextId++, type: "dot", ...DEF.dot, x: q.x - DEF.dot.w / 2, y: q.y - DEF.dot.h / 2 };
   const at = { id: dot.id, ax: 0.5, ay: 0.5 };
   const e2 = JSON.parse(JSON.stringify(e));
+  [e.terminalEnds, e2.terminalEnds] = splitTerminalMode(e.terminalEnds);
   e2.id = S.doc.nextId++; e2.from = at; e2.label = "";
   if (e.style === "elbow") {   // 分けた点と重なる曲がり角は消す(長さ 0 の区間を残さない)
     e.points = wps.slice(0, i).filter(o => dist(o, q) > 0.5); e2.points = wps.slice(i).filter(o => dist(o, q) > 0.5);
@@ -1037,6 +1182,10 @@ function endDir(end) {      // 端が横向きに出入りするか(true)、縦�
 }
 function pinDir(end) {      // 端子が外へ向いている向き(ゲートの端子だけ)。それ以外は null
   const sh = end && end.id != null ? get(end.id) : null;
+  if (sh && sh.type === "circuit" && end.pin) {
+    const p = refPt(end), c = ctr(sh), dx = p.x - c.x, dy = p.y - c.y;
+    return Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+  }
   if (!sh || sh.type !== "gate" || end.ax == null) return null;
   if (end.ax === 0) return { x: -1, y: 0 };
   if (end.ax === 1) return { x: 1, y: 0 };
@@ -1127,7 +1276,7 @@ function finishWire(tg) {
   const corners = d.pts.length ? [...d.pts, ...route(last, T, null, endDir(to))] : routeWire(d.from, to, start, T);
   if (to.id == null && d.from.id == null && dist(start, T) < 1) { render(); return; }
   const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from: d.from, to, points: simplify(start, corners, T),
-              label: "", fontSize: 18, lw: LINE_LW, arrow: "none", dash: false, wire: true };
+              label: "", fontSize: 18, lw: LINE_LW, arrow: "none", dash: false, wire: true, terminalEnds: "auto" };
   S.doc.items.push(e);
   S.sel = [e.id]; S.tool = "select";
   commit(); updateCursor();
@@ -1142,7 +1291,7 @@ function orth(last, p) {
   return Math.abs(q.x - last.x) >= Math.abs(q.y - last.y) ? { x: q.x, y: last.y } : { x: last.x, y: q.y };
 }
 
-let lastDown = null;
+let lastDown = null, circuitCompleted = null;
 svg.addEventListener("mousedown", ev => {
   if (ev.button === 1 || (ev.button === 0 && S.space)) {   // スペース+ドラッグ / ホイールを押してドラッグ → 画面を動かす
     ev.preventDefault();
@@ -1151,25 +1300,31 @@ svg.addEventListener("mousedown", ev => {
   }
   if (ev.button !== 0) return;
   const p = ptOf(ev); S.mouse = p;
+  const previousFuture = S.fut;
   const u = S.doc.underlay;
   if (S.underEdit && u && u.src) {            // 下絵の位置・大きさを調整中
     const corner = Math.hypot(p.x - (u.x + u.w), p.y - (u.y + u.h)) < px(12);
     if (corner || (p.x >= u.x && p.x <= u.x + u.w && p.y >= u.y && p.y <= u.y + u.h)) {
       pushHist();
-      S.drag = { kind: corner ? "uresize" : "umove", start: p, orig: { ...u }, moved: false };
+      S.drag = { kind: corner ? "uresize" : "umove", start: p, orig: { ...u }, moved: false, previousFuture };
     }
     return;
   }
   const now = performance.now();
-  if (lastDown && now - lastDown.t < 450 && Math.hypot(ev.clientX - lastDown.x, ev.clientY - lastDown.y) < 6) {
-    lastDown = null; closeEditor(true); onDouble(p); return;
+  if (circuitCompleted && now - circuitCompleted.t < 900 && Math.hypot(ev.clientX - circuitCompleted.x, ev.clientY - circuitCompleted.y) < 10) {
+    circuitCompleted = null; lastDown = null; return;
+  }
+  circuitCompleted = null;
+  const wireDouble = S.tool === "circuit-wire" && S.circuitDraft;
+  if (wireDouble ? circuitDoubleClick(lastDown, { t: now, x: ev.clientX, y: ev.clientY }) : lastDown && now - lastDown.t < 450 && Math.hypot(ev.clientX - lastDown.x, ev.clientY - lastDown.y) < 6) {
+    closeEditor(true); onDouble(p); lastDown = null; return;
   }
   lastDown = { t: now, x: ev.clientX, y: ev.clientY };
   closeEditor(true);
   const t = S.tool;
   if (t === "select") {
     const h = handleAt(p);
-    if (h) { pushHist(); S.drag = { kind: "handle", h, moved: false }; return; }
+    if (h) { pushHist(); S.drag = { kind: "handle", h, moved: false, previousFuture }; return; }
     const hit = hitTest(p);
     if (hit) {
       const id = hit.item.id;
@@ -1192,6 +1347,20 @@ svg.addEventListener("mousedown", ev => {
     } else {
       if (!ev.shiftKey) S.sel = [];
       S.drag = { kind: "box", start: p };
+    }
+  } else if (t === "circuit-wire") {
+    S.circuitFree = ev.altKey;
+    const target = S.circuitFree ? null : circuitEndAt(p), end = target || snapP(p);
+    S.circuitError = "";
+    if (!S.circuitDraft) {
+      const branch = !target && !S.circuitFree ? circuitWireAt(p) : null;
+      if (branch?.ambiguous) { S.circuitError = "交差する線の上では分岐先を決められません。交差から離れた位置を選んでください。"; render(); return; }
+      S.circuitDraft = branch ? { from: branch.q, branch, pts: [] } : { from: end, pts: [] };
+    }
+    else if (target) finishCircuitWire(end);
+    else {
+      const d = S.circuitDraft, last = [refPt(d.from), ...d.pts].at(-1), q = orth(last, p);
+      if (dist(last, q) > 0.5) d.pts.push(q);
     }
   } else if (DEF[t]) {
     S.drag = { kind: "create", start: snapP(p) };
@@ -1217,6 +1386,7 @@ svg.addEventListener("mousedown", ev => {
       else { const pts = draftPts(); S.draft.pts.push(pts[pts.length - 1]); }
     }
   }
+  if (S.drag) S.drag.previousFuture = previousFuture;
   render();
 });
 window.addEventListener("mousemove", ev => {
@@ -1224,7 +1394,7 @@ window.addEventListener("mousemove", ev => {
     wrap.scrollLeft = S.drag.sl - (ev.clientX - S.drag.sx); wrap.scrollTop = S.drag.st - (ev.clientY - S.drag.sy);
     return;
   }
-  S.mouse = ptOf(ev);
+  S.mouse = ptOf(ev); S.circuitFree = S.tool === "circuit-wire" && ev.altKey;
   updateCursor(ev);
   if (!S.drag && !S.draft && !S.wdraft && S.tool === "select") { updateUI(); return; }
   if (S.drag) dragMove(S.drag, S.mouse);
@@ -1257,11 +1427,19 @@ window.addEventListener("mouseup", ev => {
   if (d.kind === "create") { createShape(d.start, snapP(p)); return; }
   if (d.kind === "edge") { createEdge(d.from, endpointAt(p), d.start, p); return; }
   if (d.kind === "handle" && d.h.k !== "label" && (d.h.k === "start" || d.h.k === "end")) dropEndpoint(d, p);
-  if (!d.moved) { const prev = S.hist.pop(); if (d.kind === "seg" && prev) S.doc = JSON.parse(prev); render(); return; }
+  if (!d.moved) { if (d.previousFuture) S.fut = d.previousFuture; const prev = S.hist.pop(); if (d.kind === "seg" && prev) S.doc = JSON.parse(prev); render(); return; }
   commit();
 });
 // ダブルクリック:クリックのたびに図を描き直すので、ブラウザの dblclick は届かない。自分で判定する。
 function onDouble(p) {
+  if (S.tool === "circuit-wire") {
+    const d = S.circuitDraft;
+    if (d && d.pts.length) {
+      const end = d.pts.pop();
+      if (!finishCircuitWire(end)) d.pts.push(end);
+    }
+    render(); return;
+  }
   if (S.wdraft) {
     if (S.wdraft.pts.length) { const last = S.wdraft.pts.pop(); finishWire({ end: { x: last.x, y: last.y }, pt: last, dir: null }); return; }
     S.wdraft = null;
@@ -1272,7 +1450,7 @@ function onDouble(p) {
   S.draft = null;   // 直角の線を描き始めただけなら、やめて文字の編集にする
   S.drag = null;
   const hit = hitTest(p);   // どの道具を選んでいても、ダブルクリックで文字を編集できる
-  if (hit) { S.tool = "select"; S.sel = [hit.item.id]; render(); openEditor(hit.item); }
+  if (hit) { S.tool = "select"; S.sel = [hit.item.id]; render(); if (!hit.item.circuitWire && !["circuit", "circuit-junction"].includes(hit.item.type)) openEditor(hit.item); }
   else render();
 }
 
@@ -1386,7 +1564,7 @@ function dragMoveInner(d, p) {
     if (selShapes.length) {      // 先頭の図形の左上をグリッドに合わせる(大きさもグリッドの倍数なので、四辺ともグリッドに乗る)
       const s0 = selShapes[0];
       let tx = snapV(s0.x + dx), ty = snapV(s0.y + dy);
-      if (s0.type === "dot") { tx = snapV(s0.x + dx + s0.w / 2) - s0.w / 2; ty = snapV(s0.y + dy + s0.h / 2) - s0.h / 2; }
+      if (s0.type === "dot" || s0.type === "circuit-junction") { tx = snapV(s0.x + dx + s0.w / 2) - s0.w / 2; ty = snapV(s0.y + dy + s0.h / 2) - s0.h / 2; }
       if (s0.type === "gate") { const off = gatePinOffset(s0); ty = snapV(s0.y + dy + off) - off; }
       // 縁への吸着はグリッドと独立。近い縁や中心があれば優先する。
       if (S.doc.snapEdge) {
@@ -1411,7 +1589,7 @@ function dragMoveInner(d, p) {
     // 選んだ図形につながっている直角の線は、曲がり角も一緒に動かす
     for (const e of edges()) {
       if (sel.has(e.id) || e.style !== "elbow" || !(e.points || []).length) continue;
-      const o = O(e.id); if (!o) continue;
+      const o = O(e.id); if (!o?.points?.length) continue;
       const fs = sel.has(e.from.id), ts = sel.has(e.to.id);
       if (fs && ts) e.points = o.points.map(q => ({ x: q.x + dx, y: q.y + dy }));
       else if (fs || ts) {
@@ -1510,6 +1688,7 @@ function refPtIn(doc, end) {
   if (end.id == null) return end;
   const s = doc.items.find(i => i.id === end.id);
   if (!s) return { x: 0, y: 0 };
+  if (s.type === "circuit" && end.pin) return circuitPins({ ...s, type: s.kind, ...ctr(s) })[end.pin] || ctr(s);
   if (end.ang != null) return angPt(s, end.ang);
   if (s.type === "ellipse" || end.ax == null) return ctr(s);
   return { x: s.x + end.ax * s.w, y: s.y + end.ay * s.h };
@@ -1522,7 +1701,7 @@ function dropEndpoint(d, p) {
 // ------------------------------------------------------------------ 作る
 function createShape(a, b) {
   const t = S.tool, def = DEF[t], box = boxOf(a, b);
-  const under = t === "dot" ? shapes().find(o => o.type === "dot" && dist(ctr(o), snapP(a)) < 1)   // 線の上にも置ける
+  const under = t === "circuit-junction" ? shapes().find(o => o.type === "circuit-junction" && dist(ctr(o), snapP(a)) < 1) : t === "dot" ? shapes().find(o => o.type === "dot" && dist(ctr(o), snapP(a)) < 1)   // 線の上にも置ける
     : box.w < 15 && box.h < 15 ? (shapeAt(S.mouse) || hitTest(S.mouse)?.item) : null;
   if (under) { S.sel = [under.id]; render(); return; }   // 既にある図形の上をクリックしたら選ぶだけ
   if (t === "dot") {             // 配線の途中に置いたら、そこで線を分けてつなぐ(端の上なら、あとで autoAttach がつなぐ)
@@ -1534,11 +1713,45 @@ function createShape(a, b) {
       }
     }
   }
+  if (t === "circuit-junction") {
+    const q = snapP(a);
+    const matches = edges().filter(e => e.circuitWire && edgeOk(e)).flatMap(e => {
+      const pts = edgeGeom(e).pts;
+      const i = pts.findIndex((v, n) => n && distSeg(q, pts[n - 1], v) < 1e-7);
+      return i < 0 ? [] : [{ e, pts, i }];
+    });
+    if (matches.length > 1) {
+      S.circuitError = "交差している複数の配線には接続点を置けません。分岐する線を交差から離してください。"; render(); return;
+    }
+    if (matches.length === 1) {
+      const { e, pts } = matches[0], atStart = dist(q, pts[0]) < 0.5, atEnd = dist(q, pts.at(-1)) < 0.5;
+      if ((atStart && e.from.id != null) || (atEnd && e.to.id != null)) {
+        S.circuitError = "部品の端子には接続点を重ねられません。配線の途中を選んでください。"; render(); return;
+      }
+      pushHist();
+      const dot = { id: S.doc.nextId++, type: t, ...def, x: q.x - def.w / 2, y: q.y - def.h / 2 };
+      S.doc.items.push(dot);
+      if (atStart) e.from = { id: dot.id };
+      else if (atEnd) e.to = { id: dot.id };
+      else {
+        const to = e.to, [firstMarks, lastMarks] = splitTerminalMode(e.terminalEnds), { before, after } = splitCircuitPoints(pts, q);
+        const second = { ...e, id: S.doc.nextId++, from: { id: dot.id }, to, points: simplify(q, after.slice(1, -1), pts.at(-1)), terminalEnds: lastMarks, label: "" };
+        e.to = { id: dot.id }; e.points = simplify(pts[0], before.slice(1, -1), q); e.terminalEnds = firstMarks;
+        S.doc.items.push(second);
+      }
+      S.sel = [dot.id]; setTool("select"); commit(); return;
+    }
+  }
   pushHist();
   const s = { id: S.doc.nextId++, type: t, ...def };
   if (t === "gate") { s.kind = S.gateKind || "and"; if (s.kind === "dff") s.dffv = 2; }
   const fit = v => S.doc.snap ? Math.max(S.doc.grid, Math.round(v / S.doc.grid) * S.doc.grid) : v;
-  if (t === "dot") { const c = snapP(a); s.x = c.x - s.w / 2; s.y = c.y - s.h / 2; }
+  if (t === "circuit") {
+    s.kind = S.circuitKind || "resistor"; s.rotation = 0; s.name = ""; s.value = "";
+    s.w = CIRCUIT_TYPES[s.kind].width; s.h = CIRCUIT_TYPES[s.kind].height;
+    s.x = snapV(a.x - s.w / 2); s.y = snapV(a.y - s.h / 2);
+  } else if (t === "circuit-junction") { const c = snapP(a); s.x = c.x - s.w / 2; s.y = c.y - s.h / 2; }
+  else if (t === "dot") { const c = snapP(a); s.x = c.x - s.w / 2; s.y = c.y - s.h / 2; }
   else if (t === "gate") {        // 端子がグリッドの点に乗るように置く
     s.w = s.kind === "dff" ? 80 : fit(def.w); s.h = s.kind === "dff" ? 120 : def.h;   // D-FF は縦長(80×120)
     s.x = a.x - s.w / 2; s.y = a.y - s.h / 2;
@@ -1549,7 +1762,7 @@ function createShape(a, b) {
   S.doc.items.push(s);
   S.sel = [s.id]; setTool("select");
   commit();
-  if (t !== "gate" && t !== "dot") openEditor(s);
+  if (!["gate", "dot", "circuit", "circuit-junction"].includes(t)) openEditor(s);
 }
 function createEdge(from, to, start, p) {
   if (dist(start, p) < 10) { if (S.histPushed) { S.histPushed = false; undo(); S.fut.pop(); } else render(); return; }   // クリックしただけ(分岐も取り消す)
@@ -1724,7 +1937,7 @@ function delSel() {
 }
 function copySel() {
   const ids = new Set(S.sel);
-  const picked = S.doc.items.filter(i => ids.has(i.id) || (i.type === "edge" && ids.has(i.from.id) && ids.has(i.to.id)));
+  const picked = S.doc.items.filter(i => i.circuitWire ? ids.has(i.from.id) && ids.has(i.to.id) : ids.has(i.id) || (i.type === "edge" && ids.has(i.from.id) && ids.has(i.to.id)));
   const shapeIds = new Set(picked.filter(isShape).map(i => i.id));
   const items = picked.map(i => {
     const c = JSON.parse(JSON.stringify(i));
@@ -1737,7 +1950,7 @@ function copySel() {
     }
     return c;
   });
-  S.clip = items.length ? JSON.stringify(items) : S.clip;
+  S.clip = items.length ? JSON.stringify(items) : S.sel.some(id => get(id)?.circuitWire) ? null : S.clip;
 }
 function paste() {
   if (!S.clip) return;
@@ -1764,6 +1977,7 @@ function nudge(dx, dy) {
 }
 document.addEventListener("keyup", ev => {
   if (ev.key === " ") { S.space = false; }
+  if (ev.key === "Alt" && S.circuitFree) { S.circuitFree = false; render(); }
   updateCursor(ev);
 });
 window.addEventListener("blur", () => { S.space = false; updateCursor(); });
@@ -1771,7 +1985,7 @@ document.addEventListener("keydown", ev => {
   if (S.editing != null || ["INPUT", "SELECT", "TEXTAREA"].includes(ev.target.tagName) || ev.target.isContentEditable) return;
   if (document.querySelector("dialog[open], .pop.open")) return;
   if (ev.key === " ") { ev.preventDefault(); S.space = true; updateCursor(ev); return; }
-  if (ev.key === "Meta" || ev.key === "Control" || ev.key === "Alt") { updateCursor(ev); return; }
+  if (ev.key === "Meta" || ev.key === "Control" || ev.key === "Alt") { if (ev.key === "Alt" && S.tool === "circuit-wire") { S.circuitFree = true; render(); } updateCursor(ev); return; }
   const mod = ev.metaKey || ev.ctrlKey, k = ev.key.toLowerCase();
   if (mod && k === "z") { ev.preventDefault(); ev.shiftKey ? redo() : undo(); }
   else if (mod && k === "y") { ev.preventDefault(); redo(); }
@@ -1785,7 +1999,15 @@ document.addEventListener("keydown", ev => {
   else if (k === "-") { ev.preventDefault(); zoomStep(-1); }
   else if (k === "0") { ev.preventDefault(); setZoom(1); }
   else if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); delSel(); }
-  else if (ev.key === "Escape") { if (S.histPushed) { S.histPushed = false; S.wdraft = null; S.draft = null; undo(); S.fut.pop(); } S.wdraft = null; S.draft = null; S.drag = null; S.sel = []; setTool("select"); }
+  else if (ev.key === "Escape") { if (S.histPushed) { S.histPushed = false; S.wdraft = null; S.draft = null; undo(); S.fut.pop(); } S.wdraft = null; S.draft = null; S.circuitError = ""; S.drag = null; S.sel = []; setTool("select"); }
+  else if (ev.key === "Enter" && S.tool === "circuit-wire" && S.circuitDraft) {
+    ev.preventDefault();
+    const d = S.circuitDraft, target = S.circuitFree ? null : circuitEndAt(S.mouse);
+    const last = [refPt(d.from), ...d.pts].at(-1), q = target || orth(last, S.mouse);
+    if (!target && dist(last, q) < 0.5 && d.pts.length) {
+      const end = d.pts.pop(); if (!finishCircuitWire(end)) d.pts.push(end);
+    } else finishCircuitWire(q);
+  }
   else if (ev.key === "Enter" && S.sel.length === 1) { ev.preventDefault(); openEditor(get(S.sel[0])); }
   else if (ev.key.startsWith("Arrow")) {
     ev.preventDefault();
@@ -1798,8 +2020,8 @@ document.addEventListener("keydown", ev => {
 });
 
 function setTool(t) {
-  if (t !== "select") setToolCategory(t === "gate" ? "gate" : ["wire", "straight", "curve", "elbow"].includes(t) ? "line" : "shape");
-  if (S.histPushed) { S.histPushed = false; S.wdraft = null; S.draft = null; undo(); S.fut.pop(); } S.tool = t; S.draft = null; S.wdraft = null; render(); updateCursor(); }
+  if (t !== "select") setToolCategory(["circuit", "circuit-junction", "circuit-wire"].includes(t) ? "circuit" : t === "gate" ? "gate" : ["wire", "straight", "curve", "elbow"].includes(t) ? "line" : "shape");
+  if (S.histPushed) { S.histPushed = false; S.wdraft = null; S.draft = null; undo(); S.fut.pop(); } S.tool = t; S.draft = null; S.wdraft = null; S.circuitDraft = null; render(); updateCursor(); }
 const ICON = {
   select: '<path d="M6 3l12 9-5.5 1L15 19l-2.5 1.2-2.6-6L6 17z" fill="currentColor"/>',
   ellipse: '<ellipse cx="13" cy="11" rx="10" ry="7" fill="none" stroke="currentColor" stroke-width="1.8"/>',
@@ -1824,10 +2046,10 @@ function gateIcon(kind) {   // 実際の形(gatePrims)を小さく描いたア�
     : `<path d="${dStr(p.cmds)}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>`).join("");
   return svgIcon(body, "0 0 60 40");
 }
-const TOOL_LABEL = { select: "選択", ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", straight: "直線", curve: "曲線", elbow: "直角線", dot: "接続点", wire: "配線" };
+const TOOL_LABEL = { circuit: "回路部品", "circuit-junction": "接続点", "circuit-wire": "回路配線", select: "選択", ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", straight: "直線", curve: "曲線", elbow: "直角線", dot: "接続点", wire: "配線" };
 function setToolCategory(category) {
   document.querySelectorAll("#palette [data-group]").forEach(el => { el.hidden = el.dataset.group !== category; });
-  document.querySelectorAll(".tool-categories button").forEach(el => el.setAttribute("aria-pressed", String(el.dataset.category === category)));
+  $("tool_category").value = category;
 }
 function buildToolbar() {
   const pal = $("palette");
@@ -1835,7 +2057,7 @@ function buildToolbar() {
     const b = document.createElement("button");
     b.className = "tool"; b.dataset.tool = tool; if (extra) b.dataset.gate = extra;
     const t = TOOLS.find(t => t[0] === tool);
-    b.title = extra ? `${GATE_NAMES[extra]}(クリックして画面に置く)` : `${label}(${t[2]} キー)\n${t[3]}`;
+    b.title = extra ? `${GATE_NAMES[extra]}(クリックして画面に置く)` : `${label}${t[2] ? `(${t[2]} キー)` : ""}\n${t[3]}`;
     b.innerHTML = icon + `<span>${label}</span>`;
     b.onclick = () => { if (extra) S.gateKind = extra; setTool(tool); };
     return b;
@@ -1846,7 +2068,19 @@ function buildToolbar() {
   for (const t of ["wire", "straight", "curve", "elbow"]) { const b = btn(t, TOOL_LABEL[t], svgIcon(ICON[t])); b.dataset.group = "line"; pal.appendChild(b); }
   const g = document.createElement("div"); g.className = "gates"; g.dataset.group = "gate"; pal.appendChild(g);
   for (const k of Object.keys(GATE_NAMES)) g.appendChild(btn("gate", k === "buf" ? "BUF" : GATE_NAMES[k], gateIcon(k), k));
-  document.querySelectorAll(".tool-categories button").forEach(b => b.onclick = () => setToolCategory(b.dataset.category));
+  const cg = document.createElement("div"); cg.className = "gates"; cg.dataset.group = "circuit"; pal.appendChild(cg);
+  for (const [kind, label] of Object.entries(CIRCUIT_NAMES)) {
+    if (kind === "voltage") continue; // 既存図では残すが、新しい部品としては選ばせない
+    const prims = circuitPrimitives({ type: kind, x: 60, y: 40, rotation: 0 });
+    const body = prims.map(p => p.k === "ellipse" ? `<ellipse cx="${p.cx}" cy="${p.cy}" rx="${p.rx}" ry="${p.ry}" fill="none" stroke="currentColor" stroke-width="5"/>` : `<path d="${dStr(p.cmds)}" fill="none" stroke="currentColor" stroke-width="5"/>`).join("");
+    const b = btn("circuit", label, svgIcon(body, "0 0 120 80")); b.dataset.circuit = kind;
+    b.onclick = () => { S.circuitKind = kind; setTool("circuit"); }; cg.appendChild(b);
+  }
+  cg.appendChild(btn("circuit-junction", "接続点", svgIcon(ICON.dot)));
+  const cw = btn("circuit-wire", "回路配線", svgIcon(ICON.wire));
+  cw.title = "端子・接続点・配線途中・空白から始め、折点をクリック。端子をクリック、または空白をダブルクリックか Enter で終えます。Alt で吸着を解除します。";
+  cw.onclick = () => { S.circuitError = ""; circuitCompleted = null; lastDown = null; setTool("circuit-wire"); }; cg.appendChild(cw);
+  $("tool_category").onchange = e => { const category = e.target.value; setTool("select"); setToolCategory(category); };
   setToolCategory("shape");
 
   $("g_show").onchange = e => { S.doc.showGrid = e.target.checked; commit(); };
@@ -1885,7 +2119,7 @@ const seg = (key, opts, cur) => `<div class="seg" data-key="${key}">` + opts.map
   `<button data-v="${v}" class="${String(v) === String(cur) ? "on" : ""}" title="${tip || ""}">${label}</button>`).join("") + `</div>`;
 const sicon = n => `<svg viewBox="0 0 24 16">${SIDE_ICON[n]}</svg>`;
 const aicon = n => `<svg viewBox="0 0 24 24">${ALIGN_ICON[n]}</svg>`;
-const KIND_NAME = { image: "画像", ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", gate: "論理ゲート", dot: "接続点", edge: "矢印・線" };
+const KIND_NAME = { image: "画像", circuit: "回路部品", "circuit-junction": "回路の接続点", ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", gate: "論理ゲート", dot: "接続点", edge: "矢印・線" };
 
 function underlayHTML() {
   const u = S.doc.underlay;
@@ -1905,6 +2139,7 @@ function dotsHTML(items) {
     <div class="sec"><h4>点の大きさ</h4>${seg("dotsize", [[6, "小"], [10, "中"], [14, "大"]], cur)}</div>
     <div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
 }
+const terminalSection = e => `<div class="sec"><h4>配線端の白丸</h4><p>${e.terminalEnds === "auto" ? "開放端に自動で表示しています。" : "保存された表示設定を使用しています。"}</p><details class="side-help"><summary>白丸の詳細設定</summary>${seg("terminalEnds", [["auto", "自動"], ["none", "なし"], ["start", "始点"], ["end", "終点"], ["both", "両端"]], e.terminalEnds || "none")}<p>白丸は表示だけで、接続は変わりません。</p></details></div>`;
 function sideHTML(items) {
   if (items.length && items.every(i => i.type === "dot")) return dotsHTML(items);
   if (!items.length) return underlayHTML() + `<div class="empty">
@@ -1926,6 +2161,8 @@ function sideHTML(items) {
     例:<code>$\\alpha$</code>、<code>$x_1$</code>、<code>$10^{-3}$</code><br>
     くわしくは右上の「？ → 数式の書き方」</details></div>`;
   const one = items[0], shapesSel = items.filter(isShape), edgesSel = items.filter(i => !isShape(i));
+  if (items.length === 1 && one.type === "circuit") return `<div class="sec"><h4>${CIRCUIT_NAMES[one.kind]}</h4>${one.kind === "current_source" ? "<p>矢印は端子 a から b の向きです。回転で向きを変えられます。</p>" : one.kind === "variable_resistor" ? "<p>端子は2つです。矢印は値の調整を表します。</p>" : one.kind === "diode" ? "<p>三角形側がアノード、縦線側がカソードです。</p>" : one.kind === "voltage_dc" ? "<p>長い線が正極、短い線が負極です。</p>" : one.kind === "voltage_ac" ? "<p>交流の端子に固定した正極・負極はありません。</p>" : one.kind === "voltage" ? "<p>従来の記号と接続をそのまま保持しています。</p>" : ""}<label>部品名 <input id="c_name" maxlength="100"></label><label>値 <input id="c_value" maxlength="100"></label></div><div class="sec"><button class="btn wide" id="c_rotate">90度回転</button>${one.kind === "capacitor" ? '<label><input type="checkbox" id="c_polarized"> 極性あり</label>' : ""}</div><div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
+  if (items.length === 1 && (one.circuitWire || one.type === "circuit-junction")) return `<div class="sec"><h4>${one.circuitWire ? "回路配線" : "回路の接続点"}</h4></div>${one.circuitWire ? terminalSection(one) : ""}<div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   if (items.every(i => i.type === "image")) return `<div class="sec"><h4>${items.length === 1 ? "配置した画像" : `${items.length}枚の画像`}</h4>
     ${items.length === 1 ? `<p>${esc(one.name || "画像")}</p><label>幅（pt）<input id="image_width" type="number" min="20" max="10000" step="1" value="${Math.round(one.w * 100) / 100}"></label><p>縦横比を保って拡大・縮小します。角をドラッグしても変更できます。</p>` : ""}
     <p>画像は図と一緒に保存され、PDF・PNG・SVGにも含まれます。</p></div>
@@ -1981,7 +2218,7 @@ function sideHTML(items) {
          + (one.style === "curve" ? `<button class="btn" id="p_curvereset" title="曲がり方を最初の形に戻します">↺ 曲がりを戻す</button>` : `<span></span>`) + `</div>`;
     }
   }
-  if (edgesSel.length === 1 && isWire(edgesSel[0])) h += `<div class="sec"><button class="btn wide" id="p_branch">⑂ この配線から分岐する</button></div>`;
+  if (edgesSel.length === 1 && isWire(edgesSel[0])) h += terminalSection(edgesSel[0]) + `<div class="sec"><button class="btn wide" id="p_branch">⑂ この配線から分岐する</button></div>`;
   if (shapesSel.length >= 2) {
     h += `<div class="sec"><h4>整列</h4><div class="grid3">
       ${["left", "hcenter", "right", "top", "vcenter", "bottom"].map(k => `<button class="btn" data-align="${k}" title="${{ left: "左をそろえる", hcenter: "左右の中心をそろえる", right: "右をそろえる", top: "上をそろえる", vcenter: "上下の中心をそろえる", bottom: "下をそろえる" }[k]}">${aicon(k)}</button>`).join("")}
@@ -2051,6 +2288,13 @@ function bindSide() {
   if ($("u_op")) $("u_op").oninput = e => { u.opacity = +e.target.value; render(); push(); };
   if ($("u_del")) $("u_del").onclick = () => { pushHist(); delete S.doc.underlay; S.underEdit = false; lastPropsKey = ""; commit(); };
   const set = fn => { pushHist(); items.forEach(fn); commit(); };
+  if ($("c_name")) { $("c_name").value = items[0].name || ""; $("c_name").onchange = e => set(i => i.name = e.target.value); }
+  if ($("c_value")) { $("c_value").value = items[0].value || ""; $("c_value").onchange = e => set(i => i.value = e.target.value); }
+  if ($("c_polarized")) { $("c_polarized").checked = !!items[0].polarized; $("c_polarized").onchange = e => set(i => i.polarized = e.target.checked); }
+  if ($("c_rotate")) $("c_rotate").onclick = () => set(i => {
+    const c = ctr(i); i.rotation = ((i.rotation || 0) + 90) % 360;
+    if (i.kind !== "ground") { [i.w, i.h] = [i.h, i.w]; i.x = c.x - i.w / 2; i.y = c.y - i.h / 2; }
+  });
   if ($("image_width")) $("image_width").onchange = e => {
     const w=+e.target.value;
     if (!Number.isFinite(w) || w < 20 || w > 10000) { e.target.value=items[0].w; return; }
@@ -2059,7 +2303,8 @@ function bindSide() {
   const on = (id, ev, fn) => { const n = $(id); if (n) n.addEventListener(ev, fn); };
   document.querySelectorAll("#side .seg").forEach(sg => sg.querySelectorAll("button").forEach(b => b.onclick = () => {
     const k = sg.dataset.key, v = b.dataset.v;
-    if (k === "dotsize") set(i => { const c = ctr(i); i.w = i.h = +v; i.x = c.x - i.w / 2; i.y = c.y - i.h / 2; });
+    if (k === "terminalEnds") set(i => { if (isWire(i) || i.circuitWire) i.terminalEnds = v; });
+    else if (k === "dotsize") set(i => { const c = ctr(i); i.w = i.h = +v; i.x = c.x - i.w / 2; i.y = c.y - i.h / 2; });
     else if (k === "lw") set(i => i.lw = +v);
     else if (k === "head") {
       try { localStorage.setItem("diagram_head", v); } catch (e) {}
@@ -2128,13 +2373,14 @@ const one = items => items[0] || {};
 let lastPropsKey = "";
 function updateUI() {
   document.querySelectorAll("#palette .tool").forEach(b => b.classList.toggle("on",
-    b.dataset.tool === S.tool && (S.tool !== "gate" || b.dataset.gate === S.gateKind)));
+    b.dataset.tool === S.tool && (S.tool !== "gate" || b.dataset.gate === S.gateKind) && (S.tool !== "circuit" || b.dataset.circuit === S.circuitKind)));
   $("g_show").checked = S.doc.showGrid; $("g_snap").checked = S.doc.snap; $("g_edge_snap").checked = S.doc.snapEdge; $("g_size").value = String(S.doc.grid);
   $("b_undo").disabled = !S.hist.length; $("b_redo").disabled = !S.fut.length;
   $("b_dup").disabled = $("b_del").disabled = !S.sel.length;
   $("zpct").textContent = Math.round(S.zoom * 100) + "%";
   const key = JSON.stringify(selItems()) + "|" + (S.doc.underlay ? [S.doc.underlay.visible, !!S.underEdit].join() : "");
   if (key !== lastPropsKey && !S.drag) { lastPropsKey = key; $("side").innerHTML = sideHTML(selItems()); bindSide(); }
+  if (S.circuitError) { $("hint").textContent = S.circuitError; return; }
   if (S.mathErr.length) {   // 数式の書き間違いを下の帯に出す
     const er = S.mathErr[0], esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
     $("hint").innerHTML = `<b style="color:var(--danger)">⚠ 数式を読めませんでした</b> ・ <code>$${esc(er.tex)}$</code>(${esc(er.msg)})。そのままの文字で表示しています。`;
@@ -2144,9 +2390,13 @@ function updateUI() {
     $("hint").innerHTML = `<b style="color:var(--ink)">選択</b> ・ つながっていない線はそのまま移動、つながっている線はスライドして伸び縮み(⌥ を押しながらなら外して移動)。<b>この線から分岐するには、左の「配線」を選んで線の上をクリック</b>(緑の輪が出ます)`; return;
   }
   const t = TOOLS.find(t => t[0] === S.tool) || TOOLS[0];
-  const name = S.tool === "gate" ? GATE_NAMES[S.gateKind || "and"] : TOOL_LABEL[S.tool];
+  const name = S.tool === "gate" ? GATE_NAMES[S.gateKind || "and"] : S.tool === "circuit" ? CIRCUIT_NAMES[S.circuitKind || "resistor"] : TOOL_LABEL[S.tool];
   if (S.underEdit) { $("hint").innerHTML = `<b style="color:var(--ink)">下絵の調整</b> ・ 下絵をドラッグで移動、右下の角で拡大縮小。終わったら右の「✓ 調整を終える」`; return; }
   if (S.wdraft) { $("hint").innerHTML = `<b style="color:var(--ink)">配線</b> ・ 行き先(端子・接続点・配線の途中)をクリック。何もない所をクリックするとそこを通ります。ダブルクリックでその場で終わり、Esc でやめる`; return; }
+  if (S.tool === "circuit-wire") {
+    $("hint").textContent = "回路配線 ・ 端子・接続点・配線の途中・空白から開始し、折点をクリック。端子をクリック、または空白をダブルクリックか Enter で終了。Esc で取り消す。";
+    return;
+  }
   $("hint").innerHTML = `<b style="color:var(--ink)">${name}</b> ・ ` + (S.draft ? "曲がる所をクリック → 終点の図形をクリック(何もない所で終えるならダブルクリック、やめるなら Esc)" : t[3]);
 }
 
@@ -2289,14 +2539,21 @@ const clone = o => JSON.parse(JSON.stringify(o));
 // 開いた図を、今の形にそろえる(前の形の配線・ゲートを直し、つながりを整える)
 function tidyLoaded() {
   fixDoc();
-  detachWireEnds(); autoAttach(); normalizeWires(true); restructureWires();
+  detachWireEnds(); autoAttach(); normalizeWires(true, true); restructureWires();
 }
 
+// 新しい図では、実際に表示されるグリッドの中央を作業画面の中央に置く。
+function centerNewView() {
+  wrap.scrollLeft = Math.max(0, (S.vw * S.zoom - wrap.clientWidth) / 2);
+  wrap.scrollTop = Math.max(0, (S.vh * S.zoom - wrap.clientHeight) / 2);
+}
 export function initEditor(opts = {}) {
   onChange = opts.onChange || onChange;
   S.mathErr = [];
   buildToolbar();
   render();
+  S.circuitLastGood = JSON.stringify(S.doc);
+  centerNewView();
   onTextReady(() => { lastPropsKey = ""; render(); });   // フォント・数式の準備ができたら描き直す
   loadFont();
 }
@@ -2306,10 +2563,12 @@ export function loadDoc(doc) {
   if (S.editing != null) closeEditor(false);
   S.doc = doc ? clone(doc) : newDoc();
   tidyLoaded();
-  Object.assign(S, { sel: [], hist: [], fut: [], draft: null, wdraft: null, drag: null, underEdit: false });
+  Object.assign(S, { sel: [], hist: [], fut: [], draft: null, wdraft: null, circuitDraft: null, circuitError: "", drag: null, underEdit: false });
+  S.circuitLastGood = JSON.stringify(S.doc);
   lastPropsKey = "";
   render();
-  $("wrap").scrollLeft = $("wrap").scrollTop = 0;
+  if (doc) wrap.scrollLeft = wrap.scrollTop = 0;
+  else centerNewView();
 }
 // 一時保存から戻すときや、別の図を取り込むとき:今の図と入れ替える(⌘Z で入れ替える前に戻れる)
 export function replaceDoc(doc) {

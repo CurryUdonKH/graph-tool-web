@@ -4,6 +4,7 @@
 
 import * as store from "./store.js";
 import { readRows, guessSkip, buildTable, colLetter, rangeLabel, sheetNames, isExcel, toNumber } from "./scatter/data.js";
+import { parseCellRanges, selectArea, selectionTSV, containsCell } from "./scatter/range.mjs";
 import { dataRange } from "./scatter/plot.js";
 import { primsMarkup } from "./prims.js";
 import { layout, loadFont, onTextReady } from "./text.js";
@@ -170,7 +171,7 @@ export function createDataPage(cfg) {
       const t = e.target, f = page.S.files[+t.dataset.f];
       try {
         if (t.dataset.k === "sheet") {          // シートを変えたら、選んだ範囲はやめて、列の名前の行も探し直す
-          f.sheet = t.value; f._rows = null; f.range = null;
+          f.sheet = t.value; f._rows = null; f.range = null; sel = null;
           const rows = await rowsOf(f);
           f.skip = guessSkip(rows);
           f.table = buildTable(rows, f);
@@ -183,7 +184,7 @@ export function createDataPage(cfg) {
     }));
     body.querySelectorAll("[data-k=unrange]").forEach(n => n.addEventListener("click", async e => {
       const f = page.S.files[+e.target.dataset.f], rows = await rowsOf(f);
-      f.range = null; f.skip = guessSkip(rows); f.table = buildTable(rows, f);
+      f.range = null; f.skip = guessSkip(rows); f.table = buildTable(rows, f); sel = null;
       toast("列の名前の行を自動で探す読み方に戻しました");
       page.changed(true);
     }));
@@ -295,9 +296,11 @@ export function createDataPage(cfg) {
   }
 
   // ---------------------------------------------------------------- 元のファイルを Excel のように見て、範囲を選ぶ
-  let sel = null;          // 選んでいる範囲 { r0, c0, r1, c1, header }
+  let sel = null;          // 選んでいる範囲 { r0, c0, r1, c1, header, rows?, cols? }
+  let addSelection = false; // キーを押さずに離れた列・行を選ぶ
   let drag = null;         // ドラッグを始めた所 { ar, ac }
   addEventListener("mouseup", () => { drag = null; });
+  addEventListener("blur", () => { drag = null; });
   function showRaw(f) {
     page.dataTab = sources().indexOf(f); page.dataMode = "raw"; sel = f.range ? { ...f.range } : null;
     $("data_box").open = true;
@@ -307,42 +310,77 @@ export function createDataPage(cfg) {
   const norm = q => ({ r0: Math.min(q.ar, q.br), r1: Math.max(q.ar, q.br), c0: Math.min(q.ac, q.bc), c1: Math.max(q.ac, q.bc) });
 
   async function renderRaw(f) {
+    if (!sel && f.range) sel = { ...f.range };
     const rows = await rowsOf(f);
     const MAXR = 2000, nr = Math.min(rows.length, MAXR);
     const nc = Math.max(1, ...rows.slice(0, nr).map(r => (r || []).length));
     const cell = v => v == null ? "" : esc(v);
     let h = `<div class="rawbar" id="rawbar"></div>
-      <div class="scroll raw"><table class="tbl rawgrid" id="rawgrid"><tr><th class="corner"></th>${Array.from({ length: nc }, (_, c) => `<th class="ch" data-col="${c}">${colLetter(c)}</th>`).join("")}</tr>`;
+      <div class="scroll raw"><table class="tbl rawgrid" id="rawgrid" role="grid" tabindex="0" aria-label="元のシート。矢印キーで移動、Shiftで範囲選択"><tr><th class="corner"><button type="button" class="raw-all" aria-label="シート全体を選択">◢</button></th>${Array.from({ length: nc }, (_, c) => `<th class="ch" scope="col"><button type="button" class="raw-header" data-col="${c}" aria-label="列 ${colLetter(c)}">${colLetter(c)}</button></th>`).join("")}</tr>`;
     for (let r = 0; r < nr; r++) {
       const row = rows[r] || [];
-      h += `<tr><td class="rn">${r + 1}</td>` + Array.from({ length: nc }, (_, c) => `<td data-r="${r}" data-c="${c}">${cell(row[c])}</td>`).join("") + `</tr>`;
+      h += `<tr><th class="rn" scope="row"><button type="button" class="raw-header" data-row="${r}" aria-label="行 ${r + 1}">${r + 1}</button></th>` + Array.from({ length: nc }, (_, c) => `<td role="gridcell" id="raw-cell-${r}-${c}" data-r="${r}" data-c="${c}">${cell(row[c])}</td>`).join("") + `</tr>`;
     }
     h += `</table></div>` + (rows.length > MAXR ? `<div class="sub">(${MAXR} 行目までを表示しています)</div>` : "");
     $("data_table").innerHTML = h;
     const grid = $("rawgrid");
+    let anchor = { r: Math.min(sel?.r0 || 0, nr - 1), c: Math.min(sel?.c0 || 0, nc - 1), kind: "cell" };
+    let cursor = { ...anchor }, base = null;
+    const allRows = Math.max(0, rows.length - 1);
+    const areaBetween = (a, b) => a.kind === "cols" ? {r0:0, r1:allRows, c0:Math.min(a.c,b.c), c1:Math.max(a.c,b.c)}
+      : a.kind === "rows" ? {r0:Math.min(a.r,b.r), r1:Math.max(a.r,b.r), c0:0, c1:nc-1}
+      : norm({ ar:a.r, ac:a.c, br:b.r, bc:b.c });
+    const focusCell = () => {
+      grid.focus({preventScroll:true});
+      grid.querySelector(`[data-r="${cursor.r}"][data-c="${cursor.c}"]`)?.scrollIntoView({block:"nearest", inline:"nearest"});
+    };
 
     // 色をつける:使っている範囲(緑の枠)と、選んでいる範囲(青)
     const paint = () => {
       const used = f.range || null;
       grid.querySelectorAll("td[data-r]").forEach(td => {
         const r = +td.dataset.r, c = +td.dataset.c;
-        td.classList.toggle("sel", !!sel && r >= sel.r0 && r <= sel.r1 && c >= sel.c0 && c <= sel.c1);
-        td.classList.toggle("used", !!used && r >= used.r0 && r <= used.r1 && c >= used.c0 && c <= used.c1);
-        td.classList.toggle("head", !!used && used.header && r === used.r0 && c >= used.c0 && c <= used.c1);
+        td.classList.toggle("sel", containsCell(sel, r, c));
+        td.setAttribute("aria-selected", String(containsCell(sel, r, c)));
+        td.classList.toggle("active-cell", !!sel && r === cursor.r && c === cursor.c);
+        td.classList.toggle("used", containsCell(used, r, c));
+        td.classList.toggle("head", !!used?.header && r === used.r0 && containsCell(used, r, c));
       });
+      grid.querySelectorAll(".raw-header").forEach(button => {
+        const axis = button.dataset.col != null ? "cols" : "rows";
+        const index = +(button.dataset.col ?? button.dataset.row);
+        button.setAttribute("aria-pressed", String(!!sel?.[axis]?.includes(index)));
+      });
+      if (nr) grid.setAttribute("aria-activedescendant", `raw-cell-${cursor.r}-${cursor.c}`);
       bar();
     };
     const bar = () => {
-      const n = sel ? `<b>${rangeLabel(sel)}</b>(${sel.r1 - sel.r0 + 1} 行 × ${sel.c1 - sel.c0 + 1} 列)` : "まだ選んでいません";
-      $("rawbar").innerHTML = `<div class="sub">表の上をドラッグして、グラフに使う範囲を選びます(列の記号をクリックで列ごと、Shift+クリックで広げる)。
+      const n = sel ? `<b>${rangeLabel(sel)}</b>(${sel.rows?.length ?? sel.r1 - sel.r0 + 1} 行 × ${sel.cols?.length ?? sel.c1 - sel.c0 + 1} 列)` : "まだ選んでいません";
+      $("rawbar").innerHTML = `<div class="sub">ドラッグで範囲選択。⌘ / Ctrl を押しながら別の範囲を追加、Shift で選択を拡張できます。矢印キーで移動、⌘ / Ctrl＋C でコピー。
           ${f.range ? `今使っている範囲は <span class="usedmark">${rangeLabel(f.range)}</span> です。` : "今は、列の名前の行を自動で探して読んでいます。"}</div>
-        <div class="row" style="margin-top:6px">選んだ範囲:${n}
-          <label class="ck" style="margin-left:8px"><input type="checkbox" id="raw_head" ${!sel || sel.header !== false ? "checked" : ""}>1 行目を列の名前にする</label></div>
+        <div class="row" style="margin-top:6px"><label>セル範囲 <input id="raw_address" type="text" aria-label="セル範囲" placeholder="例: A1:A10, C1:C10" value="${sel ? esc(sel.areas ? rangeLabel(sel) : `${colLetter(sel.c0)}${sel.r0 + 1}:${colLetter(sel.c1)}${sel.r1 + 1}`) : ""}"></label>
+          <button class="btn" id="raw_select">範囲を選択</button><span id="raw_address_error" role="status"></span></div>
+        <div class="row" style="margin-top:6px"><label class="ck"><input type="checkbox" id="raw_multi" ${addSelection ? "checked" : ""}>追加選択（キー不要）</label>選んだ範囲:${n}${sel?.areas?.length > 1 ? `<span class="sub">選んでいないセルは空欄として扱います</span>` : ""}
+          <label class="ck" style="margin-left:8px"><input type="checkbox" id="raw_head" ${!sel || sel.header !== false ? "checked" : ""}>選んだ最初の行を列の名前にする</label></div>
         <div class="row" style="margin-top:6px">
+          <button class="btn" id="raw_copy" ${sel ? "" : "disabled"}>選択範囲をコピー</button>
           <button class="btn primary" id="raw_use" ${sel ? "" : "disabled"}>この範囲をグラフに使う</button>
           <button class="btn" id="raw_add" ${sel ? "" : "disabled"} title="1 つのシートに表がいくつも並んでいるときに。別のデータとして重ねて描けます">この範囲を別のデータとして追加</button>
           ${f.range ? `<button class="btn" id="raw_auto">自動に戻す</button>` : ""}</div>`;
+      $("raw_multi").onchange = e => { addSelection = e.target.checked; };
       $("raw_head").onchange = e => { if (sel) sel.header = e.target.checked; };
+      const selectAddress = () => {
+        try {
+          const q = parseCellRanges($("raw_address").value, rows);
+          sel = { ...q, header: $("raw_head").checked };
+          anchor = {r:sel.r0,c:sel.c0,kind:"cell"}; cursor = {...anchor}; base = null;
+          paint();
+          $("raw_address").focus();
+        } catch (err) { $("raw_address_error").textContent = err.message; }
+      };
+      $("raw_select").onclick = selectAddress;
+      $("raw_address").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); selectAddress(); } };
+      $("raw_copy").onclick = copySelection;
       $("raw_use").onclick = () => useRange(f, false);
       $("raw_add").onclick = () => useRange(f, true);
       if ($("raw_auto")) $("raw_auto").onclick = async () => {
@@ -351,35 +389,75 @@ export function createDataPage(cfg) {
       };
     };
 
-    // ドラッグで選ぶ
-    const at = el => el && el.dataset && el.dataset.r != null ? { r: +el.dataset.r, c: +el.dataset.c } : null;
-    grid.addEventListener("mousedown", e => {
-      const th = e.target.closest("th[data-col]");
-      if (th) {                                  // 列の記号:その列の、中身がある最初の行から最後の行まで
-        const c = +th.dataset.col;
-        const c0 = e.shiftKey && sel ? Math.min(sel.c0, c) : c, c1 = e.shiftKey && sel ? Math.max(sel.c1, c) : c;
-        let first = -1, last = -1;
-        rows.forEach((r, i) => {
-          for (let k = c0; k <= c1; k++) if (r && r[k] != null && String(r[k]).trim() !== "") { if (first < 0) first = i; last = i; }
-        });
-        sel = { r0: Math.max(0, first), r1: Math.max(0, last), c0, c1, header: sel ? sel.header : true };
-        paint(); return;
+    async function copySelection() {
+      if (!sel) return;
+      try { await navigator.clipboard.writeText(selectionTSV(rows, sel)); toast("選択範囲をコピーしました。Excelにも貼り付けられます"); }
+      catch { toast("コピーできませんでした。シート上で ⌘ / Ctrl＋C をお試しください"); }
+    }
+    const at = el => {
+      const cell = el.closest("td[data-r]");
+      if (cell) return {r:+cell.dataset.r,c:+cell.dataset.c,kind:"cell"};
+      const button = el.closest(".raw-header");
+      if (!button) return null;
+      return button.dataset.col != null ? {r:0,c:+button.dataset.col,kind:"cols"} : {r:+button.dataset.row,c:0,kind:"rows"};
+    };
+    const begin = (p, e) => {
+      const header = $("raw_head").checked;
+      if (!(e.shiftKey && sel && anchor.kind === p.kind)) {
+        anchor = {...p}; base = (e.metaKey || e.ctrlKey || addSelection) ? sel : null;
       }
-      const p = at(e.target.closest("td[data-r]"));
-      if (!p) return;
-      e.preventDefault();
-      const header = sel ? sel.header : true;
-      if (e.shiftKey && sel) drag = { ar: sel.r0 === p.r ? sel.r1 : sel.r0, ac: sel.c0 === p.c ? sel.c1 : sel.c0 };
-      else drag = { ar: p.r, ac: p.c };
-      sel = { ...norm({ ...drag, br: p.r, bc: p.c }), header };
+      cursor = {...p};
+      sel = selectArea(base, areaBetween(anchor, cursor), !!base); sel.header = header;
       paint();
+    };
+    const selectAll = () => {
+      anchor = {r:0,c:0,kind:"cell"}; cursor = {...anchor}; base = null;
+      sel = selectArea(sel, {r0:0,r1:allRows,c0:0,c1:nc-1}); paint(); focusCell();
+    };
+    grid.addEventListener("click", e => {
+      if (e.target.closest(".raw-all")) { selectAll(); return; }
+      // キーボードやタッチ補助機能が発生させるクリック。
+      if (e.detail === 0) { const p = at(e.target); if (p) { begin(p, e); focusCell(); } }
+    });
+    grid.addEventListener("mousedown", e => {
+      if (e.button !== 0) return;
+      const p = at(e.target); if (!p) return;
+      e.preventDefault(); begin(p, e); drag = {grid}; grid.focus({preventScroll:true});
     });
     grid.addEventListener("mouseover", e => {
-      if (!drag) return;
-      const p = at(e.target.closest("td[data-r]"));
-      if (!p) return;
-      sel = { ...norm({ ...drag, br: p.r, bc: p.c }), header: sel.header };
-      paint();
+      if (drag?.grid !== grid) return;
+      const p = at(e.target); if (!p || p.kind !== anchor.kind) return;
+      cursor = {...p};
+      sel = {...selectArea(base, areaBetween(anchor, cursor), !!base), header:sel.header}; paint();
+    });
+    grid.addEventListener("keydown", e => {
+      if (e.isComposing || e.target.closest("button")) return;
+      const command = e.metaKey || e.ctrlKey;
+      if (command && e.key.toLowerCase() === "a") { e.preventDefault(); selectAll(); return; }
+      if (command && e.key.toLowerCase() === "c") return; // 標準のcopyイベントを使う。
+      if (e.key === "Escape") { e.preventDefault(); addSelection = false; begin({...cursor,kind:"cell"}, {}); $("raw_copy").focus(); return; }
+      const moves = {ArrowLeft:[0,-1],ArrowRight:[0,1],ArrowUp:[-1,0],ArrowDown:[1,0],Enter:[e.shiftKey?-1:1,0],Tab:[0,e.shiftKey?-1:1]};
+      let delta = moves[e.key];
+      if (!delta && e.key !== "Home" && e.key !== "End") return;
+      e.preventDefault();
+      const p = {r:cursor.r,c:cursor.c,kind:"cell"};
+      if (e.key === "Tab") {
+        const next = p.r * nc + p.c + delta[1];
+        if (next < 0 || next >= nr * nc) { $("raw_copy").focus(); return; }
+        p.r = Math.floor(next / nc); p.c = next % nc;
+      }
+      else if (e.key === "Home") { p.c = 0; if (command) p.r = 0; }
+      else if (e.key === "End") { p.c = nc-1; if (command) p.r = nr-1; }
+      else { p.r = Math.max(0, Math.min(nr-1, p.r + delta[0])); p.c = Math.max(0, Math.min(nc-1, p.c + delta[1])); }
+      if (!e.shiftKey || e.key === "Enter" || e.key === "Tab") { anchor = {...p}; base = null; }
+      cursor = p;
+      sel = {...selectArea(base, areaBetween(anchor, cursor), !!base),header:sel?.header !== false};
+      paint(); focusCell();
+    });
+    grid.addEventListener("copy", e => {
+      if (!sel || !e.clipboardData) return;
+      e.preventDefault(); e.clipboardData.setData("text/plain", selectionTSV(rows, sel));
+      toast("選択範囲をコピーしました");
     });
     paint();
   }
@@ -387,7 +465,9 @@ export function createDataPage(cfg) {
   // 選んだ範囲を使う(asNew = true なら、同じファイルの別のデータとして足す)
   async function useRange(f, asNew) {
     if (!sel) return;
-    const range = { r0: sel.r0, c0: sel.c0, r1: sel.r1, c1: sel.c1, header: sel.header !== false };
+    const range = { r0: sel.r0, c0: sel.c0, r1: sel.r1, c1: sel.c1, header: sel.header !== false,
+      ...(sel.rows ? { rows: [...sel.rows] } : {}), ...(sel.cols ? { cols: [...sel.cols] } : {}),
+      ...(sel.areas ? {areas: clone(sel.areas)} : {}) };
     const rows = await rowsOf(f);
     let target = f;
     if (asNew) {
@@ -400,7 +480,7 @@ export function createDataPage(cfg) {
     target.range = range;
     target.table = buildTable(rows, target);
     const t = target.table;
-    if (!t.numeric.some(Boolean)) toast("選んだ範囲に数値の列が見つかりません。範囲や「1 行目を列の名前にする」を見直してください");
+    if (!t.numeric.some(Boolean)) toast("選んだ範囲に数値の列が見つかりません。範囲や「選んだ最初の行を列の名前にする」を見直してください");
     else toast(asNew ? `「${target.name}」として追加しました` : `${rangeLabel(range)} をグラフに使います`);
     if (cfg.onFilesAdded && asNew) cfg.onFilesAdded(page, [target.name]);
     sel = { ...range };
@@ -489,6 +569,7 @@ export function createDataPage(cfg) {
   }
 
   function loadState(rec) {
+    sel = null; drag = null; addSelection = false;
     const st = rec ? { ...cfg.defaultState(), ...clone(rec.state) } : cfg.defaultState();
     st.axes = { x: { ...defaultAxis(), ...(st.axes || {}).x }, y: { ...defaultAxis(), ...(st.axes || {}).y } };
     if (cfg.fixState) cfg.fixState(st);

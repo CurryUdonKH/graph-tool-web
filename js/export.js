@@ -28,14 +28,16 @@ const f2 = v => Math.round(v * 100) / 100;
 
 // 1 つの SVG ファイルとして完結した文字列を作る(文字は輪郭の線にする)
 // box を渡すと、その範囲をそのまま書き出す(大きさを cm で決めた図など)。省略すると描いた範囲 + 余白
-export async function buildSVG(prims, box) {
+export async function buildSVG(prims, box, maxWidthPt = null) {
   const texts = prims.filter(p => p.k === "text");
   await ready(texts.map(p => p.s), texts.map(p => p.font || "gothic"));
   const r = box || primsBounds(prims);
   if (!r) return null;
   const b = box ? box : { x: r.x - MARGIN, y: r.y - MARGIN, w: r.w + 2 * MARGIN, h: r.h + 2 * MARGIN };
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${f2(b.w)}pt" height="${f2(b.h)}pt" viewBox="${f2(b.x)} ${f2(b.y)} ${f2(b.w)} ${f2(b.h)}">${primsMarkup(prims, true)}</svg>`;
-  return { svg, w: b.w, h: b.h };
+  const scale = Number.isFinite(maxWidthPt) && maxWidthPt > 0 ? Math.min(1, maxWidthPt / b.w) : 1;
+  const w = b.w * scale, h = b.h * scale;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${f2(w)}pt" height="${f2(h)}pt" viewBox="${f2(b.x)} ${f2(b.y)} ${f2(b.w)} ${f2(b.h)}">${primsMarkup(prims, true)}</svg>`;
+  return { svg, w, h };
 }
 
 export const MIME = { pdf: "application/pdf", png: "image/png", svg: "image/svg+xml" };

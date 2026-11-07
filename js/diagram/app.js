@@ -31,7 +31,7 @@ async function refreshList() {
   sel.value = cur.id && list.some(r => r.id === cur.id) ? cur.id : "__new__";
   $("d_delete").disabled = $("f_dup").disabled = !cur.id;
   const rec = cur.id ? list.find(r => r.id === cur.id) : null;
-  const n = rec ? (rec.snapshots || []).length : 0;
+  const n = rec ? (rec.snapshots || []).length + (rec.sketchOriginal ? 1 : 0) : 0;
   $("d_restore").textContent = `↩ 戻す(${n})`;
   $("d_restore").disabled = !n;
   // 名前を決めていない新しい図には、fig1、fig2 … のうち空いている番号の名前をつける
@@ -116,7 +116,7 @@ function takeSnapshot(note = "") {
 
 async function fillRestore() {
   const rec = cur.id ? await store.getDiagram(cur.id) : null;
-  const snaps = rec ? rec.snapshots || [] : [];
+  const snaps = rec ? [...(rec.sketchOriginal ? [{ time: rec.created, note: "取込時の原画に近い配置", doc: rec.sketchOriginal }] : []), ...(rec.snapshots || [])] : [];
   const pop = $("p_restore");
   pop.innerHTML = `<div class="cap">一時保存した状態に戻します。戻す前の状態も自動で一時保存されるので、やり直せます。</div>` +
     snaps.map((sn, i) => `<button class="item" data-i="${i}">${mdhm(new Date(sn.time))}:${pad(new Date(sn.time).getSeconds())}` +
@@ -245,8 +245,9 @@ async function doExport(fmt = null) {
   if (!prims.length) { toast("まだ何も描かれていません"); return; }
   const busy = setTimeout(() => $("busy").classList.add("show"), 250);   // 初回はフォントなどの読み込みで少し待つ
   try {
-    await exportWithPreview(fmt, prims, currentName(), null, "描いた範囲だけを書き出します(グリッド・下絵・選択の印は入りません)。",
-      () => { clearTimeout(busy); $("busy").classList.remove("show"); });
+    const note = "描いた範囲だけを書き出します(グリッド・下絵・選択の印は入りません)。" + (getDoc().circuitSketchClean ? " 清書した回路は書き出し時に幅を最大16.9 cmに縮小します（線や文字も同じ倍率で縮小）。" : "");
+    await exportWithPreview(fmt, prims, currentName(), null, note,
+      () => { clearTimeout(busy); $("busy").classList.remove("show"); }, getDoc().circuitSketchClean ? 480 : null);
   } catch (e) {
     console.error(e);
     dialog("書き出せませんでした", `<p>${esc(e.message || e)}</p>`);
@@ -269,12 +270,12 @@ async function start() {
   $("f_new").onclick = () => newDiagram();
   $("f_dup").onclick = () => duplicateCurrent();
   $("f_merge").onclick = () => openMerge();
-  bindSketchImport(async doc => {
+  bindSketchImport(async (doc, source) => {
     flushChanges();
     await chain;
     const name = nextName("fig", (await store.listDiagrams()).map(r => r.name));
     const now = store.nowISO();
-    const rec = { id: store.newId(), name, created: now, updated: now, doc: clone(doc), snapshots: [] };
+    const rec = { id: store.newId(), name, created: now, updated: now, doc: clone(doc), snapshots: [], sketchOriginal: clone(source.original), sketchSource: source.input };
     await store.addDiagram(rec); // add は ID が衝突した場合に失敗し、既存の図を変更しない。
     store.notify({ type: "saved", id: rec.id });
     try { await openDiagram(rec.id); zoomFit(1); }
@@ -296,7 +297,10 @@ async function start() {
     const last = await store.getSetting("lastDiagram");
     const pick = list.find(r => r.id === last) || (last === null ? null : list[0]);
     if (pick) await openDiagram(pick.id); else await refreshList();
-    if (location.hash === "#sketch-import") $("f_sketch").click();
+    if (location.hash === "#sketch-import") {
+      history.replaceState(history.state, "", location.pathname + location.search);
+      $("f_sketch").click();
+    }
   } catch (e) {
     console.error(e);
     dialog("保存の機能が使えません", `<p>このブラウザでは図を保存できないようです(プライベートブラウズでは使えないことがあります)。描くことと書き出しはできます。</p><p><small>${esc(e.message || e)}</small></p>`);

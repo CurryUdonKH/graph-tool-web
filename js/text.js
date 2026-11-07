@@ -87,7 +87,9 @@ function mathSvg(tex) {
   try {
     const node = window.MathJax.tex2svg(tex, { display: false });
     const svgEl = node.querySelector("svg");
-    if (node.querySelector("[data-mjx-error]")) out = { err: node.querySelector("[data-mjx-error]").getAttribute("data-mjx-error") };
+    const unsafe = svgEl && (svgEl.querySelector("a,script,foreignObject,image,style") || [...svgEl.querySelectorAll("*")].some(el => [...el.attributes].some(a => /^on/i.test(a.name) || /^(?:href|xlink:href|src)$/i.test(a.name))));
+    if (unsafe) out = { err: "リンクや外部の内容を含む数式は使えません" };
+    else if (node.querySelector("[data-mjx-error]")) out = { err: node.querySelector("[data-mjx-error]").getAttribute("data-mjx-error") };
     else {
       const vb = svgEl.getAttribute("viewBox").split(/\s+/).map(Number);
       const body = Array.from(svgEl.children).filter(c => c.tagName !== "defs").map(c => c.outerHTML).join("");

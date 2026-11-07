@@ -21,8 +21,8 @@ const pref = {
 };
 
 // fmt:最初に選んでおく形式(省略すると前回の形式)、note:見本の下に出す説明、onShown:小窓を出すときに呼ぶ
-export async function exportWithPreview(fmt, prims, name, box, note = "", onShown = () => {}) {
-  const r = await buildSVG(prims, box);   // 書き出すものと同じ絵(文字は線にしたもの)
+export async function exportWithPreview(fmt, prims, name, box, note = "", onShown = () => {}, maxWidthPt = null) {
+  const r = await buildSVG(prims, box, maxWidthPt);   // 書き出すものと同じ絵(文字は線にしたもの)
   let dir = null;
   if (canPick) { try { dir = (await store.getSetting("exportDir")) || null; } catch (e) {} }
   onShown();

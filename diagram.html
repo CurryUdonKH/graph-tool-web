@@ -78,8 +78,8 @@
     </div>
   </div>
   <div id="main">
-    <aside class="tool-panel" aria-label="作図の道具"><div class="panel-heading"><b>道具</b><span>選んで図に置く</span></div><nav class="tool-categories" aria-label="道具の種類"><button type="button" data-category="shape" aria-pressed="true">図形</button><button type="button" data-category="line" aria-pressed="false">線</button><button type="button" data-category="gate" aria-pressed="false">ゲート</button></nav><div id="palette"></div></aside>
-    <div class="canvas-panel"><div class="canvas-heading"><b>作図スペース</b><span>図形を置いて、線でつなぎます</span></div><div id="wrap"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg><textarea id="edit" rows="1"></textarea></div></div>
+    <aside class="tool-panel" aria-label="作図の道具"><div class="panel-heading"><b>道具</b><span>選んで図に置く</span></div><div class="tool-category"><label for="tool_category">部品：</label><select id="tool_category" aria-label="部品の種類"><option value="shape">図形</option><option value="line">線</option><option value="gate">ゲート</option><option value="circuit">回路</option></select></div><div id="palette"></div></aside>
+    <div class="canvas-panel"><div class="canvas-heading"><b>作図スペース</b><span class="canvas-instruction">図形を置いて、線でつなぎます</span><button class="ib sketch-entry" id="b_sketch" title="普段の AI で手書き画像を JSON に変換し、確認して取り込みます"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4zM16 4v4h4M8 15l3-3 2 2 3-3"/></svg><span><b>AIで手書き図を清書</b><small>いつもの AI で変換 → 結果を貼り付け</small></span></button></div><div id="wrap"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg><textarea id="edit" rows="1"></textarea></div></div>
     <aside class="properties-panel" aria-label="選択したものの設定"><div class="panel-heading"><b>設定</b><span>選択したものを調整</span></div><div id="side"></div></aside>
   </div>
   <div id="hint"></div>
@@ -87,20 +87,35 @@
 
 <dialog id="sketch_dialog" class="sketch-dialog" aria-labelledby="sketch_title">
   <h3 id="sketch_title">手書き図を取り込む</h3>
-  <p>手書き画像と変換指示を普段使う AI に渡し、返された JSON を貼り付けます。画像や JSON はこのツールから送信されません。</p>
+  <p>画像の変換には、普段お使いの AI を使います。</p>
+  <ol class="sketch-steps"><li>変換指示をコピー</li><li>手書き画像と一緒に、普段の AI に送る</li><li>返された結果を貼り付ける</li></ol>
   <div class="sketch-prompt-actions"><button type="button" class="btn" id="sketch_copy">変換指示をコピー</button><span id="sketch_copy_status" role="status"></span></div>
-  <details class="sketch-instructions"><summary>変換指示を見る・手動でコピーする</summary><textarea id="sketch_prompt" readonly rows="6" aria-label="AI への変換指示"></textarea></details>
-  <p class="sketch-note">対応: 四角、楕円、台形、多角形、注釈、文字、直線・矢印。曲線や論理ゲートは取り込めません。</p>
+  <details class="sketch-instructions"><summary>詳しく見る</summary>
+    <p>JSON または単一のコードブロックを貼り付けるか、JSON ファイルを選べます。画像や JSON は、このツールから外部へ送信されません。</p>
+    <p>対応: 四角、楕円、台形、多角形、注釈、文字、直線・曲線の矢印と、抵抗・電源などの電気回路。論理ゲートや同じ図形に戻る線は取り込めません。</p>
+    <label for="sketch_prompt">変換指示を表示・手動でコピー</label><textarea id="sketch_prompt" readonly rows="6" aria-label="AI への変換指示"></textarea>
+  </details>
   <label class="sketch-label" for="sketch_input">JSON を貼り付ける</label>
-  <textarea id="sketch_input" rows="6" spellcheck="false" placeholder="ここに JSON を貼り付け"></textarea>
-  <div class="sketch-actions"><button type="button" class="btn sketch-file" id="sketch_file_button">JSON ファイルを選択</button><input type="file" id="sketch_file" accept=".json,application/json" hidden><button type="button" class="btn" id="sketch_preview_button">内容を確認</button></div>
+  <textarea id="sketch_input" rows="6" spellcheck="false" placeholder="JSON またはコードブロックを貼り付け"></textarea>
+  <div class="sketch-actions"><button type="button" class="btn sketch-file" id="sketch_file_button">JSON ファイルを選択</button><input type="file" id="sketch_file" accept=".json,application/json" hidden><button type="button" class="btn primary" id="sketch_preview_button">内容を確認</button></div>
   <p id="sketch_error" class="sketch-error" role="alert" hidden></p>
   <section id="sketch_result" hidden aria-label="取り込み内容の見本">
     <h4>取り込みの見本</h4><p class="sketch-note">位置や接続が正しいか確認してください。見本の後も編集できます。</p>
+    <fieldset class="sketch-mode"><legend>仕上がりを選ぶ</legend>
+      <label><input type="radio" name="sketch_mode" value="original" checked> 原画に近い（グリッド調整）</label>
+      <label><input type="radio" name="sketch_mode" value="tidy"> 清書案</label>
+      <div class="sketch-tidy-options" id="sketch_tidy_options" hidden>
+        <label><input type="checkbox" id="tidy_align" checked> 同種図形の行・列を揃える</label>
+        <label><input type="checkbox" id="tidy_nested" checked> 単一の入れ子を中央に揃える</label>
+        <label><input type="checkbox" id="tidy_symmetric" checked> 安全な曲線を左右対称にする</label>
+      </div>
+      <p class="sketch-note">どちらもグリッドに合わせます。清書は条件に合う箇所だけ整えます。作成後も「戻す」から元の配置に戻せます。</p>
+      <p id="sketch_changes" class="sketch-changes" aria-live="polite"></p>
+    </fieldset>
     <div class="sketch-preview"><svg id="sketch_preview" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="取り込む図の見本"></svg></div>
     <div id="sketch_warnings" class="sketch-warnings" hidden><b>判断できなかった点</b><ul id="sketch_warning_list"></ul><label class="ck"><input type="checkbox" id="sketch_ack">注意事項を確認しました</label></div>
   </section>
-  <div class="acts"><button type="button" class="btn" id="sketch_cancel">やめる</button><button type="button" class="btn primary" id="sketch_confirm" disabled>新しい図として作成</button></div>
+  <div class="acts"><button type="button" class="btn" id="sketch_cancel">やめる</button><button type="button" class="btn primary" id="sketch_confirm" disabled hidden>新しい図として作成</button></div>
 </dialog>
 
 <dialog id="format_dialog" class="format-dialog" aria-labelledby="format_title">
