@@ -6,7 +6,7 @@ import { snapToGuides } from "./snap.mjs";
 import { isWire, migrateWireTypes } from "./wiretypes.mjs";
 import { remapStyles } from "./textstyles.mjs";
 import { hasTerminal, terminalMode, splitTerminalMode, terminalPrimitives } from "./terminal-marks.mjs";
-import { circuitPins, circuitPrimitives, circuitRouteConflict, circuitPathCrossesBody, splitCircuitPoints, CIRCUIT_TYPES } from "./circuit-model.mjs";
+import { circuitPins, circuitPrimitives, circuitRouteConflict, circuitPathCrossesBody, circuitRouteCandidates, splitCircuitPoints, CIRCUIT_TYPES } from "./circuit-model.mjs";
 import { circuitDoubleClick } from "./circuit-interaction.mjs";
 // 図の作成エディタ(ブラウザ版)
 // 楕円・四角・注釈・文字と、直線/曲線/直角の矢印、論理ゲート・配線・接続点をマウスで置く。
@@ -440,7 +440,7 @@ const headPrim = (e, tip, from) => ({ k: "path", cmds: headCmds(tip, from, e.lw,
 // ------------------------------------------------------------------ 論理ゲートの形
 // 右向き。入力は左の辺(2 入力なら高さの 1/4 と 3/4、1 入力なら真ん中)、出力は右の辺の真ん中。
 const circuitCenter = s => ctr(s);
-const CIRCUIT_NAMES = { resistor: "抵抗", variable_resistor: "可変抵抗（2端子）", capacitor: "コンデンサ", inductor: "コイル", diode: "ダイオード", current_source: "電流源", voltage_dc: "直流電源", voltage_ac: "交流電源", ground: "接地", voltage: "従来の電圧源" };
+const CIRCUIT_NAMES = { switch: "スイッチ", nmos: "MOSFET（Nチャネル）", pmos: "MOSFET（Pチャネル）", resistor: "抵抗", variable_resistor: "可変抵抗（2端子）", capacitor: "コンデンサ", inductor: "コイル", diode: "ダイオード", current_source: "電流源", voltage_dc: "直流電源", voltage_ac: "交流電源", ground: "接地", voltage: "従来の電圧源" };
 const GATE_NAMES = { and: "AND", or: "OR", not: "NOT", nand: "NAND", nor: "NOR", xor: "XOR", xnor: "XNOR", buf: "バッファ", dff: "D-FF" };
 // D フリップフロップの端子(図形の左上からの割合):左 d・clock、右 q、上 set、下 reset
 // 高さを 3 等分した所に d・q と clock を置く(標準 80×120 = グリッド 4×6 マスで、端子がすべてグリッドに乗る)
@@ -2088,9 +2088,10 @@ function buildToolbar() {
   const cg = document.createElement("div"); cg.className = "gates"; cg.dataset.group = "circuit"; pal.appendChild(cg);
   for (const [kind, label] of Object.entries(CIRCUIT_NAMES)) {
     if (kind === "voltage") continue; // 既存図では残すが、新しい部品としては選ばせない
-    const prims = circuitPrimitives({ type: kind, x: 60, y: 40, rotation: 0 });
+    const spec = CIRCUIT_TYPES[kind];
+    const prims = circuitPrimitives({ type: kind, x: spec.width / 2, y: spec.height / 2, rotation: 0, pinLabels: false });
     const body = prims.map(p => p.k === "ellipse" ? `<ellipse cx="${p.cx}" cy="${p.cy}" rx="${p.rx}" ry="${p.ry}" fill="none" stroke="currentColor" stroke-width="5"/>` : `<path d="${dStr(p.cmds)}" fill="none" stroke="currentColor" stroke-width="5"/>`).join("");
-    const b = btn("circuit", label, svgIcon(body, "0 0 120 80")); b.dataset.circuit = kind;
+    const b = btn("circuit", label, svgIcon(body, `0 0 ${spec.width} ${spec.height}`)); b.dataset.circuit = kind;
     b.onclick = () => { S.circuitKind = kind; setTool("circuit"); }; cg.appendChild(b);
   }
   cg.appendChild(btn("circuit-junction", "接続点", svgIcon(ICON.dot)));
@@ -2191,7 +2192,7 @@ function sideHTML(items) {
     例:<code>$\\alpha$</code>、<code>$x_1$</code>、<code>$10^{-3}$</code><br>
     くわしくは右上の「？ → 数式の書き方」</details></div>`;
   const one = items[0], shapesSel = items.filter(isShape), edgesSel = items.filter(i => !isShape(i));
-  if (items.length === 1 && one.type === "circuit") return `<div class="sec"><h4>${CIRCUIT_NAMES[one.kind]}</h4>${one.kind === "current_source" ? "<p>矢印は端子 a から b の向きです。回転で向きを変えられます。</p>" : one.kind === "variable_resistor" ? "<p>端子は2つです。矢印は値の調整を表します。</p>" : one.kind === "diode" ? "<p>三角形側がアノード、縦線側がカソードです。</p>" : one.kind === "voltage_dc" ? "<p>長い線が正極、短い線が負極です。</p>" : one.kind === "voltage_ac" ? "<p>交流の端子に固定した正極・負極はありません。</p>" : one.kind === "voltage" ? "<p>従来の記号と接続をそのまま保持しています。</p>" : ""}<label>部品名 <input id="c_name" maxlength="100"></label><label>値 <input id="c_value" maxlength="100"></label></div><div class="sec"><button class="btn wide" id="c_rotate">90度回転</button>${one.kind === "capacitor" ? '<label><input type="checkbox" id="c_polarized"> 極性あり</label>' : ""}</div><div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
+  if (items.length === 1 && one.type === "circuit") return `<div class="sec"><h4>${CIRCUIT_NAMES[one.kind]}</h4>${one.kind === "switch" ? "<p>2端子のスイッチです。開く・閉じるを切り替えても配線は保たれます。</p>" : ["nmos", "pmos"].includes(one.kind) ? "<p>G：ゲート、D：ドレイン、S：ソース。基板端子を省略した簡略記号です。Pチャネルはゲートに白丸があります。</p>" : one.kind === "current_source" ? "<p>矢印は端子 a から b の向きです。回転で向きを変えられます。</p>" : one.kind === "variable_resistor" ? "<p>端子は2つです。矢印は値の調整を表します。</p>" : one.kind === "diode" ? "<p>三角形側がアノード、縦線側がカソードです。</p>" : one.kind === "voltage_dc" ? "<p>長い線が正極、短い線が負極です。</p>" : one.kind === "voltage_ac" ? "<p>交流の端子に固定した正極・負極はありません。</p>" : one.kind === "voltage" ? "<p>従来の記号と接続をそのまま保持しています。</p>" : ""}<label>部品名 <input id="c_name" maxlength="100"></label><label>値 <input id="c_value" maxlength="100"></label></div><div class="sec"><button class="btn wide" id="c_rotate">90度回転</button>${one.kind === "switch" ? seg("switchstate", [["open", "開く"], ["closed", "閉じる"]], one.closed ? "closed" : "open") : ""}${["nmos", "pmos"].includes(one.kind) ? '<label><input type="checkbox" id="c_pin_labels"> 端子名（G・D・S）を表示</label>' : ""}${one.kind === "capacitor" ? '<label><input type="checkbox" id="c_polarized"> 極性あり</label>' : ""}</div><div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   if (items.length === 1 && (one.circuitWire || one.type === "circuit-junction")) return `<div class="sec"><h4>${one.circuitWire ? "回路配線" : "回路の接続点"}</h4></div>${one.circuitWire ? terminalSection(one) : ""}<div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   if (items.every(i => i.type === "image")) return `<div class="sec"><h4>${items.length === 1 ? "配置した画像" : `${items.length}枚の画像`}</h4>
     ${items.length === 1 ? `<p>${esc(one.name || "画像")}</p><label>幅（pt）<input id="image_width" type="number" min="20" max="10000" step="1" value="${Math.round(one.w * 100) / 100}"></label><p>縦横比を保って拡大・縮小します。角をドラッグしても変更できます。</p>` : ""}
@@ -2319,10 +2320,23 @@ function bindSide() {
   };
   if ($("c_name")) { $("c_name").value = items[0].name || ""; $("c_name").onchange = e => set(i => i.name = e.target.value); }
   if ($("c_value")) { $("c_value").value = items[0].value || ""; $("c_value").onchange = e => set(i => i.value = e.target.value); }
+  if ($("c_pin_labels")) { $("c_pin_labels").checked = items[0].pinLabels !== false; $("c_pin_labels").onchange = e => { const checked = e.target.checked; set(i => i.pinLabels = checked); }; }
   if ($("c_polarized")) { $("c_polarized").checked = !!items[0].polarized; $("c_polarized").onchange = e => set(i => i.polarized = e.target.checked); }
   if ($("c_rotate")) $("c_rotate").onclick = () => set(i => {
     const c = ctr(i); i.rotation = ((i.rotation || 0) + 90) % 360;
     if (i.kind !== "ground") { [i.w, i.h] = [i.h, i.w]; i.x = c.x - i.w / 2; i.y = c.y - i.h / 2; }
+    const parts = shapes().filter(s => s.type === "circuit");
+    const nodes = parts.flatMap(s => Object.entries(circuitPins({ ...s, type: s.kind, ...ctr(s) })).map(([pin, p]) => ({ ...p, id: s.id, pin })));
+    nodes.push(...shapes().filter(s => s.type === "circuit-junction").map(s => ({ ...ctr(s), id: s.id })));
+    const changed = edges().filter(e => e.circuitWire && [e.from.id, e.to.id].includes(i.id));
+    const pending = new Set(changed), routed = [];
+    const unchanged = edges().filter(e => e.circuitWire && !pending.has(e) && edgeOk(e)).map(e => ({ points: edgeGeom(e).pts, ends: [e.from, e.to] }));
+    for (const e of changed) {
+      const ends = [e.from, e.to], start = refPt(e.from), end = refPt(e.to);
+      const candidate = circuitRouteCandidates(start, end, pinDir(e.from), pinDir(e.to), parts, S.doc.grid)
+        .find(points => !circuitRouteConflict(points, ends, [...unchanged, ...routed], nodes));
+      if (candidate) { e.points = candidate.slice(1, -1); routed.push({ points: candidate, ends }); }
+    }
   });
   if ($("image_width")) $("image_width").onchange = e => {
     const w=+e.target.value;
@@ -2332,7 +2346,8 @@ function bindSide() {
   const on = (id, ev, fn) => { const n = $(id); if (n) n.addEventListener(ev, fn); };
   document.querySelectorAll("#side .seg").forEach(sg => sg.querySelectorAll("button").forEach(b => b.onclick = () => {
     const k = sg.dataset.key, v = b.dataset.v;
-    if (k === "pointsize") set(i => resizePoint(i, +v));
+    if (k === "switchstate") set(i => { if (i.type === "circuit" && i.kind === "switch") i.closed = v === "closed"; });
+    else if (k === "pointsize") set(i => resizePoint(i, +v));
     else if (k === "pointlabel") set(i => i.labelPosition = v);
     else if (k === "terminalEnds") set(i => { if (isWire(i) || i.circuitWire) i.terminalEnds = v; });
     else if (k === "dotsize") set(i => { const c = ctr(i); i.w = i.h = +v; i.x = c.x - i.w / 2; i.y = c.y - i.h / 2; });

@@ -1,6 +1,7 @@
 // 電気回路の下準備。接続は座標の一致から推測せず、端子・接続点の ID で表す。
 // 編集画面と取り込みで共通の端子・描画・接続検査を使う。
 export const CIRCUIT_TYPES = Object.freeze({
+  switch: { pins: ['a', 'b'], width: 120, height: 80 },
   resistor: { pins: ['a', 'b'], width: 120, height: 80 },
   variable_resistor: { pins: ['a', 'b'], width: 120, height: 80 },
   capacitor: { pins: ['a', 'b'], width: 120, height: 80 },
@@ -10,6 +11,8 @@ export const CIRCUIT_TYPES = Object.freeze({
   voltage_dc: { pins: ['positive', 'negative'], width: 120, height: 80 },
   voltage_ac: { pins: ['a', 'b'], width: 120, height: 80 },
   current_source: { pins: ['a', 'b'], width: 120, height: 80 },
+  nmos: { pins: ['gate', 'drain', 'source'], width: 120, height: 120 },
+  pmos: { pins: ['gate', 'drain', 'source'], width: 120, height: 120 },
   ground: { pins: ['terminal'], width: 80, height: 80 },
 });
 
@@ -21,7 +24,7 @@ export function circuitPins(component) {
   const rotation = component.rotation ?? 0;
   const rotate = ({ x, y }) => rotation === 0 ? { x, y } : rotation === 90 ? { x: -y, y: x } :
     rotation === 180 ? { x: -x, y: -y } : { x: y, y: -x };
-  const points = component.type === 'ground' ? [{ x: 0, y: -40 }] : [{ x: -60, y: 0 }, { x: 60, y: 0 }];
+  const points = ['nmos', 'pmos'].includes(component.type) ? [{ x: -60, y: 0 }, { x: 20, y: component.type === 'nmos' ? -60 : 60 }, { x: 20, y: component.type === 'nmos' ? 60 : -60 }] : component.type === 'ground' ? [{ x: 0, y: -40 }] : [{ x: -60, y: 0 }, { x: 60, y: 0 }];
   return Object.fromEntries(spec.pins.map((name, i) => {
     const p = rotate(points[i]);
     return [name, { x: component.x + p.x, y: component.y + p.y }];
@@ -94,12 +97,32 @@ export function circuitPrimitives(component) {
   const line = (x1, y1, x2, y2) => path([[x1, y1], [x2, y2]]);
   const circle = (x, y, r) => { const [cx, cy] = xy(x, y); return { k: 'ellipse', cx, cy, rx: r, ry: r, lw, fill: '#ffffff' }; };
   const out = [];
-  if (component.type !== 'ground') {
+  const mosfet = ['nmos', 'pmos'].includes(component.type);
+  if (mosfet) {
+    // 基板端子を省略したエンハンスメント型の簡略記号。Pチャネルだけゲートに白丸。
+    // https://www.ele.kochi-tech.ac.jp/tacibana/etc/analog-intro/mosfet.html 図1(b)・図2(b)
+    out.push(line(-20, -26, -20, 26), line(-8, -26, -8, 26),
+      path([[20, -60], [20, -24], [-8, -24]]), path([[-8, 24], [20, 24], [20, 60]]));
+    if (component.type === 'pmos') out.push(line(-60, 0, -32, 0), circle(-26, 0, 6));
+    else out.push(line(-60, 0, -20, 0));
+    if (component.pinLabels !== false) {
+      const top = component.type === 'nmos' ? 'D' : 'S', bottom = component.type === 'nmos' ? 'S' : 'D';
+      for (const [s, x, y] of [['G', -44, -12], [top, 32, -46], [bottom, 32, 46]]) {
+        const [tx, ty] = xy(x, y);
+        out.push({ k: 'text', x: tx, y: ty, s, size: 12, ha: 'center', va: 'center' });
+      }
+    }
+  } else if (component.type !== 'ground') {
     out.push(line(-60, 0, -30, 0), line(30, 0, 60, 0));
     if (['resistor', 'variable_resistor'].includes(component.type)) out.push(path([[-30, -14], [30, -14], [30, 14], [-30, 14], [-30, -14]], '#ffffff'));
     if (component.type === 'variable_resistor') {
       // 抵抗本体を斜めに横切る矢印。端子は a・b の 2 つだけ。
       out.push(path([[-32, 27], [28, -27]]), path([[17, -24], [28, -27], [24, -16]]));
+    }
+    if (component.type === 'switch') {
+      out.push(line(-30, 0, -24, 0), line(24, 0, 30, 0),
+        line(-24, 0, component.closed ? 24 : 20, component.closed ? 0 : -24),
+        circle(-24, 0, 3), circle(24, 0, 3));
     }
     if (component.type === 'capacitor') {
       out.push(line(-30, 0, -6, 0), line(6, 0, 30, 0), line(-6, -20, -6, 20), line(6, -20, 6, 20));
@@ -140,7 +163,8 @@ export function circuitPrimitives(component) {
     out.push(line(0, -40, 0, 0), line(-24, 0, 24, 0), line(-16, 7, 16, 7), line(-8, 14, 8, 14));
   }
   const label = [component.name, component.value].filter(v => typeof v === 'string' && v.trim()).join('  ');
-  if (label) out.push({ k: 'text', x: component.x + (rotation % 180 ? 48 : 0), y: component.y + (rotation % 180 ? 0 : 48), s: label, size: component.fontSize ?? 16, ha: rotation % 180 ? 'left' : 'center', va: 'center' });
+  if (label && mosfet) out.push({ k: 'text', x: component.x + (rotation % 180 ? 0 : 72), y: component.y + (rotation % 180 ? 72 : 0), s: label, size: component.fontSize ?? 16, ha: rotation % 180 ? 'center' : 'left', va: 'center' });
+  else if (label) out.push({ k: 'text', x: component.x + (rotation % 180 ? 48 : 0), y: component.y + (rotation % 180 ? 0 : 48), s: label, size: component.fontSize ?? 16, ha: rotation % 180 ? 'left' : 'center', va: 'center' });
   return out;
 }
 
@@ -200,4 +224,38 @@ export function circuitPathCrossesBody(points, body) {
     return (Math.abs(a.y - b.y) < eps && a.y > body.y + eps && a.y < body.y + body.h - eps && Math.max(a.x, b.x) > body.x + eps && Math.min(a.x, b.x) < body.x + body.w - eps) ||
       (Math.abs(a.x - b.x) < eps && a.x > body.x + eps && a.x < body.x + body.w - eps && Math.max(a.y, b.y) > body.y + eps && Math.min(a.y, b.y) < body.y + body.h - eps);
   });
+}
+
+// 回転後も端子の外側から配線するための候補。採用前に部品・他の配線との衝突を検査する。
+export function circuitRouteCandidates(start, end, startDirection, endDirection, bodies, grid = 20) {
+  const stub = (p, d) => d ? { x: p.x + d.x * grid, y: p.y + d.y * grid } : p;
+  const a = stub(start, startDirection), b = stub(end, endDirection);
+  // 大きな図でも候補数が膨らまないよう、近い部品の外周を経路候補に使う。衝突検査は全ての部品で行う。
+  const distance = o => Math.min(...[a, b].map(p => Math.max(o.x-p.x, 0, p.x-o.x-o.w) + Math.max(o.y-p.y, 0, p.y-o.y-o.h)));
+  const nearby = [...bodies].sort((x,y) => distance(x)-distance(y)).slice(0,8);
+  const xs = new Set([a.x, b.x, ...nearby.flatMap(o => [o.x - grid, o.x - 2 * grid, o.x + o.w + grid, o.x + o.w + 2 * grid])]);
+  const ys = new Set([a.y, b.y, ...nearby.flatMap(o => [o.y - grid, o.y - 2 * grid, o.y + o.h + grid, o.y + o.h + 2 * grid])]);
+  const mids = [[a, { x: b.x, y: a.y }, b], [a, { x: a.x, y: b.y }, b]];
+  for (const x of xs) mids.push([a, { x, y: a.y }, { x, y: b.y }, b]);
+  for (const y of ys) mids.push([a, { x: a.x, y }, { x: b.x, y }, b]);
+  for (const x of xs) for (const y of ys) {
+    mids.push([a, { x, y: a.y }, { x, y }, { x: b.x, y }, b],
+      [a, { x: a.x, y }, { x, y }, { x, y: b.y }, b]);
+  }
+  const clean = points => {
+    const out = [];
+    for (const p of points) {
+      if (out.length && p.x === out.at(-1).x && p.y === out.at(-1).y) continue;
+      while (out.length >= 2) {
+        const q = out.at(-2), r = out.at(-1);
+        if (q.x === r.x && r.x === p.x && (r.y-q.y)*(p.y-r.y) >= 0 || q.y === r.y && r.y === p.y && (r.x-q.x)*(p.x-r.x) >= 0) out.pop();
+        else break;
+      }
+      out.push(p);
+    }
+    return out;
+  };
+  const length = points => points.slice(1).reduce((sum,p,i) => sum + Math.abs(p.x-points[i].x) + Math.abs(p.y-points[i].y),0);
+  return mids.map(m => clean([start,...m,end])).filter(points => !bodies.some(body => circuitPathCrossesBody(points,body)))
+    .sort((a,b) => length(a)-length(b) || a.length-b.length);
 }
