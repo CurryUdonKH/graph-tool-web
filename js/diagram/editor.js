@@ -1,3 +1,4 @@
+import { cleanupCircuitJunctions } from "./circuit-cleanup.mjs";
 import { pointPrimitives, resizePoint } from "./coordinate-point.mjs";
 import { paintOrder, reorderedItems } from "./stacking.mjs";
 import { imagePrimitive, resizeImage, readPlacedImage } from "./placed-image.mjs";
@@ -113,6 +114,7 @@ function fixDoc() {
       for (const k of ["angle", "size", "a0", "a1"]) delete e[k];
     }
   }
+  d.items = cleanupCircuitJunctions(d.items, refPt);
 }
 
 const $ = id => document.getElementById(id);
@@ -1940,6 +1942,8 @@ function delSel() {
   if (!S.sel.length) return;
   pushHist();
   const ids = new Set(S.sel);
+  const affectedJunctions = new Set(edges().filter(e => e.circuitWire &&
+    (ids.has(e.id) || ids.has(e.from.id) || ids.has(e.to.id))).flatMap(e => [e.from.id, e.to.id]));
   // 配線は残す:消す図形(ゲート・● など)につながっていた端を、その場所の点にする
   for (const e of edges()) {
     if (ids.has(e.id) || !isWire(e) || !edgeOk(e)) continue;
@@ -1949,6 +1953,7 @@ function delSel() {
   }
   // 矢印(配線でない線)は、今までどおりつながっていた図形と一緒に消す
   S.doc.items = S.doc.items.filter(i => !ids.has(i.id) && !(i.type === "edge" && (ids.has(i.from.id) || ids.has(i.to && i.to.id))));
+  S.doc.items = cleanupCircuitJunctions(S.doc.items, refPt, affectedJunctions);
   S.sel = []; commit();
 }
 function copySel() {
