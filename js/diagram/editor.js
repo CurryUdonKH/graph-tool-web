@@ -1,3 +1,4 @@
+import { attachCircuitEnds, circuitEditHandles } from "./circuit-edit.mjs";
 import { cleanupCircuitJunctions } from "./circuit-cleanup.mjs";
 import { pointPrimitives, resizePoint } from "./coordinate-point.mjs";
 import { paintOrder, reorderedItems } from "./stacking.mjs";
@@ -30,7 +31,7 @@ const TOOLS = [
   ["dot", "● 接続点", "", "配線が分かれる所に置く黒い点。クリックした所のグリッドの点に置きます。点から線を引いたり、線の端を点につないだりできます。"],
   ["circuit", "回路部品", "", "クリックで部品を置きます。"],
   ["circuit-junction", "接続点", "", "配線の分岐点を置きます。"],
-  ["circuit-wire", "回路配線", "", "端子・接続点・空白をクリックして配線します。交差は接続されません。"],
+  ["circuit-wire", "回路配線", "", "端子・接続点・配線途中・空白から引き、端子や配線途中をクリックしてつなぎます。交差は接続されません。"],
   ["gate", "", "G", "クリックで論理ゲートを置く。入力は左の辺、出力は右の辺につなぎます(線の端がグリッドの点に合います)。"],
   ["straight", "→ 直線", "L", "図形から図形へドラッグ。同じ図形の上で離すと自分に戻る矢印(ループ)になります。"],
   ["curve", "⤻ 曲線", "C", "図形から図形へドラッグ。選ぶと出る真ん中の ● で全体のふくらみ、◇ でその側の曲がり方を変えられます(両端は動きません)。両端の ○ は図形から離して置くこともできます。同じ図形の上で離すと、自分に戻る矢印になります。"],
@@ -564,7 +565,7 @@ function gatePrims(s) {
 // ------------------------------------------------------------------ 描く図形の一覧(Python にも送る)
 // 接続点につながっている線の本数。2 本だけ(ただの曲がり角・つなぎ目)のときは ● を描かない
 const dotDegree = id => edges().reduce((n, e) => n + (e.from.id === id) + (e.to.id === id), 0);
-const hiddenDot = s => s.type === "dot" && dotDegree(s.id) === 2;
+const hiddenDot = s => ["dot", "circuit-junction"].includes(s.type) && dotDegree(s.id) === 2;
 function textAlign(s) {   // 文字の寄せ方(横, 縦)。決めていなければ、注釈は左上・それ以外は真ん中
   return [s.align || (s.type === "note" ? "left" : "center"), s.valign || (s.type === "note" ? "top" : "middle")];
 }
@@ -609,7 +610,7 @@ function buildPrims() {
     whiteTerminals.push(...marks); out.push(...marks);
   }
   // 白丸と黒い接続点が重なっても、実際の接続点は黒く表示する。
-  for (const s of shapes().filter(o => o.type === "circuit-junction" || (o.type === "dot" && !hiddenDot(o)))) {
+  for (const s of shapes().filter(o => ["circuit-junction", "dot"].includes(o.type) && !hiddenDot(o))) {
     const c = ctr(s);
     if (whiteTerminals.some(p => dist(c, { x: p.cx, y: p.cy }) < 0.5))
       out.push({ k: "ellipse", cx: c.x, cy: c.y, rx: s.type === "dot" ? s.w / 2 : 4, ry: s.type === "dot" ? s.h / 2 : 4, lw: s.lw, fill: "#000000" });
@@ -720,7 +721,7 @@ function drawOverlay() {
           el("line", { x1: g.start.x, y1: g.start.y, x2: g.c1.x, y2: g.c1.y, stroke: A, "stroke-width": px(1), "stroke-dasharray": dsh });
           el("line", { x1: g.end.x, y1: g.end.y, x2: g.c2.x, y2: g.c2.y, stroke: A, "stroke-width": px(1), "stroke-dasharray": dsh });
         }
-        for (const h of (it.circuitWire ? [] : g.handles)) {
+        for (const h of (it.circuitWire ? circuitEditHandles(g.handles) : g.handles)) {
           if (h.k === "c1" || h.k === "c2") { const r = px(6); el("path", { d: `M${h.x} ${h.y - r}L${h.x + r} ${h.y}L${h.x} ${h.y + r}L${h.x - r} ${h.y}Z`, fill: "#fff", stroke: A, "stroke-width": px(1.5) }); }
           else el("circle", { cx: h.x, cy: h.y, r: px(6), fill: h.k === "start" || h.k === "end" ? "#fff" : A, stroke: A, "stroke-width": px(1.5) });
         }
@@ -749,7 +750,7 @@ function drawOverlay() {
   }
   if (S.tool === "circuit-wire") {
     const target = S.circuitFree ? null : circuitEndAt(S.mouse);
-    const branch = !S.circuitDraft && !target && !S.circuitFree ? circuitWireAt(S.mouse) : null;
+    const branch = !target && !S.circuitFree ? circuitWireAt(S.mouse) : null;
     const q = target ? refPt(target) : branch ? branch.q : S.circuitDraft ? orth([refPt(S.circuitDraft.from), ...S.circuitDraft.pts].at(-1), S.mouse) : snapP(S.mouse);
     el("circle", { cx: q.x, cy: q.y, r: px(target || branch ? 9 : 5), fill: "none", stroke: branch?.ambiguous ? "#b43e3e" : "#1b8b69", "stroke-width": px(2) });
     if (branch && !branch.ambiguous) el("circle", { cx: q.x, cy: q.y, r: px(3), fill: "#1b8b69", stroke: "none" });
@@ -839,11 +840,10 @@ function handleAt(p) {
   const it = get(S.sel[0]);
   if (!it) return null;
   if (isShape(it) && ["circuit", "circuit-junction", "point"].includes(it.type)) return null;
-  if (it.circuitWire) return null;
   if (isShape(it)) { const h = cornerHandles(it).find(h => dist(h, p) < px(8)); return h ? { ...h, item: it } : null; }
   if (!edgeOk(it)) return null;
   const g = edgeGeom(it);
-  const h = g.handles.find(h => dist(h, p) < px(8));
+  const h = (it.circuitWire ? circuitEditHandles(g.handles) : g.handles).find(h => dist(h, p) < px(it.circuitWire ? 10 : 8));
   if (h) return { ...h, item: it, g };
   if (it.label && dist(g.label, p) < px(7)) return { k: "label", item: it, g };
   return null;
@@ -1032,6 +1032,13 @@ function circuitGeometryValid() {
   return true;
 }
 function commit() {
+  const previous = S.circuitLastGood ? JSON.parse(S.circuitLastGood).items : [];
+  attachCircuitEnds(S.doc.items, previous);
+  const detached = new Set(previous.filter(e => e.circuitWire).flatMap(e => {
+    const current = get(e.id);
+    return ["from", "to"].filter(k => e[k].id != null && (!current || current[k].id !== e[k].id)).map(k => e[k].id);
+  }));
+  S.doc.items = cleanupCircuitJunctions(S.doc.items, refPt, detached);
   detachWireEnds(); autoAttach(); normalizeWires(true); restructureWires();
   if (!circuitGeometryValid()) {
     if (S.circuitLastGood) S.doc = JSON.parse(S.circuitLastGood);
@@ -1060,9 +1067,9 @@ function circuitEndAt(p) {
   return best;
 }
 // 既存の回路配線の線分上にある、分岐の候補を探す。交差点は曖昧なので拒否する。
-function circuitWireAt(p) {
+function circuitWireAt(p, excludeId = null) {
   let best = null, bd = px(8);
-  for (const e of edges().filter(e => e.circuitWire && edgeOk(e))) {
+  for (const e of edges().filter(e => e.circuitWire && e.id !== excludeId && edgeOk(e))) {
     const pts = edgeGeom(e).pts;
     for (let i = 1; i < pts.length; i++) {
       const a = pts[i - 1], b = pts[i], d = distSeg(p, a, b);
@@ -1073,7 +1080,7 @@ function circuitWireAt(p) {
     }
   }
   if (!best) return null;
-  const n = edges().filter(e => e.circuitWire && edgeOk(e) && edgeGeom(e).pts.some((p, i, pts) => i && distSeg(best.q, pts[i - 1], p) < 1e-7)).length;
+  const n = edges().filter(e => e.circuitWire && e.id !== excludeId && edgeOk(e) && edgeGeom(e).pts.some((p, i, pts) => i && distSeg(best.q, pts[i - 1], p) < 1e-7)).length;
   return n > 1 ? { ambiguous: true, q: best.q } : best;
 }
 // 明示的な分岐点を元の線に挿入し、外側の白丸と経路を保つ。
@@ -1092,7 +1099,7 @@ function splitCircuitAt(e, q) {
   }
   return { id: dot.id };
 }
-function finishCircuitWire(to) {
+function finishCircuitWire(to, destinationBranch = null) {
   const d = S.circuitDraft, a = refPt(d.from), b = refPt(to);
   const fixed = [a, ...d.pts], last = fixed[fixed.length - 1];
   if (dist(last, b) < 0.5 && !d.pts.length) return false;
@@ -1100,8 +1107,16 @@ function finishCircuitWire(to) {
   const points = simplify(a, [...d.pts, ...route(last, b, null, dir ? dir.x !== 0 : null)], b);
   if (!points) { S.circuitError = "接続が曖昧にならない経路を見つけられません。位置を調整してください。"; render(); return false; }
   const apply = () => {
-    const from = d.branch ? splitCircuitAt(get(d.branch.id), d.branch.q) : d.from;
-    const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from, to, points, label: "", fontSize: 16, lw: LINE_LW, arrow: "none", dash: false, wire: false, circuitWire: true, terminalEnds: "auto" };
+    const branchEnd = branch => {
+      const existing = circuitEndAt(branch.q);
+      if (existing && dist(refPt(existing), branch.q) < 0.5) return existing;
+      const hit = circuitWireAt(branch.q);
+      if (!hit || hit.ambiguous) throw new Error("接続する配線を選び直してください。");
+      return splitCircuitAt(get(hit.id), branch.q);
+    };
+    const from = d.branch ? branchEnd(d.branch) : d.from;
+    const target = destinationBranch ? branchEnd(destinationBranch) : to;
+    const e = { id: S.doc.nextId++, type: "edge", style: "elbow", from, to: target, points, label: "", fontSize: 16, lw: LINE_LW, arrow: "none", dash: false, wire: false, circuitWire: true, terminalEnds: "auto" };
     S.doc.items.push(e); return e;
   };
   const before = JSON.stringify(S.doc);
@@ -1371,7 +1386,11 @@ svg.addEventListener("mousedown", ev => {
       S.circuitDraft = branch ? { from: branch.q, branch, pts: [] } : { from: end, pts: [] };
     }
     else if (target) finishCircuitWire(end);
-    else {
+    else if (!S.circuitFree && circuitWireAt(p)) {
+      const branch = circuitWireAt(p);
+      if (branch.ambiguous) S.circuitError = "交差する線の上では接続先を決められません。交差から離れた位置を選んでください。";
+      else finishCircuitWire(branch.q, branch);
+    } else {
       const d = S.circuitDraft, last = [refPt(d.from), ...d.pts].at(-1), q = orth(last, p);
       if (dist(last, q) > 0.5) d.pts.push(q);
     }
@@ -1681,12 +1700,15 @@ function dragMoveInner(d, p) {
     } else if (h.k === "start" || h.k === "end") {
       if (!d.init) { const g = edgeGeom(it); d.init = { M: g.mid }; }   // 真ん中の点はその場にとどめる
       let end;
-      if (isWire(it)) {   // 配線は端子・●・グリッドだけ(文字や四角は無視)。となりの点からまっすぐ伸ばすのを優先
+      if (it.circuitWire) {
+        if (!d.nb) { const pts = edgeGeom(it).pts; d.nb = h.k === "start" ? { ...pts[1] } : { ...pts.at(-2) }; }
+        end = circuitEndAt(p) || straightSnap(p, d.nb);
+      } else if (isWire(it)) {   // 配線は端子・●・グリッドだけ(文字や四角は無視)。となりの点からまっすぐ伸ばすのを優先
         if (!d.nb) { const pts = edgeGeom(it).pts; d.nb = h.k === "start" ? { ...pts[1] } : { ...pts[pts.length - 2] }; }
         end = pinAt(p) || straightSnap(p, d.nb);
       } else end = endpointAt(p);
       const other = h.k === "start" ? it.to : it.from;
-      if (end.id != null && end.id === other.id && end.ang == null && end.ax == null) {
+      if (!it.circuitWire && end.id != null && end.id === other.id && end.ang == null && end.ax == null) {
         const sh = get(end.id); end = anchorOn(sh, boundary(sh, p));   // 同じ図形の上では輪郭に乗せる
       }
       if (h.k === "start") it.from = end; else it.to = end;
@@ -1708,6 +1730,15 @@ function refPtIn(doc, end) {
 }
 function dropEndpoint(d, p) {
   const e = d.h.item;
+  if (e.circuitWire) {
+    const side = d.h.k === "start" ? "from" : "to";
+    if (e[side].id == null) {
+      const branch = circuitWireAt(e[side], e.id);
+      if (branch && !branch.ambiguous && dist(branch.q, e[side]) < 0.5)
+        e[side] = splitCircuitAt(get(branch.id), branch.q);
+    }
+    return;
+  }
   if (e.from.id != null && e.to.id != null && e.from.id === e.to.id && e.style !== "curve") makeLoop(e);
 }
 
@@ -2101,7 +2132,7 @@ function buildToolbar() {
   }
   cg.appendChild(btn("circuit-junction", "接続点", svgIcon(ICON.dot)));
   const cw = btn("circuit-wire", "回路配線", svgIcon(ICON.wire));
-  cw.title = "端子・接続点・配線途中・空白から始め、折点をクリック。端子をクリック、または空白をダブルクリックか Enter で終えます。Alt で吸着を解除します。";
+  cw.title = "端子・接続点・配線途中・空白から始め、折点をクリック。端子・配線途中をクリック、または空白をダブルクリックか Enter で終えます。Alt で吸着を解除します。";
   cw.onclick = () => { S.circuitError = ""; circuitCompleted = null; lastDown = null; setTool("circuit-wire"); }; cg.appendChild(cw);
   $("tool_category").onchange = e => { const category = e.target.value; setTool("select"); setToolCategory(category); };
   setToolCategory("shape");
@@ -2198,7 +2229,7 @@ function sideHTML(items) {
     くわしくは右上の「？ → 数式の書き方」</details></div>`;
   const one = items[0], shapesSel = items.filter(isShape), edgesSel = items.filter(i => !isShape(i));
   if (items.length === 1 && one.type === "circuit") return `<div class="sec"><h4>${CIRCUIT_NAMES[one.kind]}</h4>${one.kind === "switch" ? "<p>2端子のスイッチです。開く・閉じるを切り替えても配線は保たれます。</p>" : ["nmos", "pmos"].includes(one.kind) ? "<p>G：ゲート、D：ドレイン、S：ソース。基板端子を省略した簡略記号です。Pチャネルはゲートに白丸があります。</p>" : one.kind === "current_source" ? "<p>矢印は端子 a から b の向きです。回転で向きを変えられます。</p>" : one.kind === "variable_resistor" ? "<p>端子は2つです。矢印は値の調整を表します。</p>" : one.kind === "diode" ? "<p>三角形側がアノード、縦線側がカソードです。</p>" : one.kind === "voltage_dc" ? "<p>長い線が正極、短い線が負極です。</p>" : one.kind === "voltage_ac" ? "<p>交流の端子に固定した正極・負極はありません。</p>" : one.kind === "voltage" ? "<p>従来の記号と接続をそのまま保持しています。</p>" : ""}<label>部品名 <input id="c_name" maxlength="100"></label><label>値 <input id="c_value" maxlength="100"></label></div><div class="sec"><button class="btn wide" id="c_rotate">90度回転</button>${one.kind === "switch" ? seg("switchstate", [["open", "開く"], ["closed", "閉じる"]], one.closed ? "closed" : "open") : ""}${["nmos", "pmos"].includes(one.kind) ? '<label><input type="checkbox" id="c_pin_labels"> 端子名（G・D・S）を表示</label>' : ""}${one.kind === "capacitor" ? '<label><input type="checkbox" id="c_polarized"> 極性あり</label>' : ""}</div><div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
-  if (items.length === 1 && (one.circuitWire || one.type === "circuit-junction")) return `<div class="sec"><h4>${one.circuitWire ? "回路配線" : "回路の接続点"}</h4></div>${one.circuitWire ? terminalSection(one) : ""}<div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
+  if (items.length === 1 && (one.circuitWire || one.type === "circuit-junction")) return `<div class="sec"><h4>${one.circuitWire ? "回路配線" : "回路の接続点"}</h4></div>${one.circuitWire ? "<p>線を選び、両端の丸をドラッグすると長さや接続先を変えられます。</p>" + terminalSection(one) : ""}<div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   if (items.every(i => i.type === "image")) return `<div class="sec"><h4>${items.length === 1 ? "配置した画像" : `${items.length}枚の画像`}</h4>
     ${items.length === 1 ? `<p>${esc(one.name || "画像")}</p><label>幅（pt）<input id="image_width" type="number" min="20" max="10000" step="1" value="${Math.round(one.w * 100) / 100}"></label><p>縦横比を保って拡大・縮小します。角をドラッグしても変更できます。</p>` : ""}
     <p>画像は図と一緒に保存され、PDF・PNG・SVGにも含まれます。</p></div>
