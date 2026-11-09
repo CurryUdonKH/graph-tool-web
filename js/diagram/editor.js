@@ -245,7 +245,9 @@ function shapeAt(p, exclude) {
   for (let i = list.length - 1; i >= 0; i--) {
     const s = list[i];
     if (exclude && exclude.includes(s.id)) continue;
-    if (s.type === "dot" || s.type === "point") {           // 小さいので、少し広めに当たりをとる
+    if (s.type === "point") { // 表示倍率にかかわらず、黒点の周囲にもつかめる余白を設ける
+      if (dist(p, ctr(s)) <= Math.max(s.w / 2 + px(5), px(14))) return s;
+    } else if (s.type === "dot") {
       if (dist(p, ctr(s)) <= Math.max(s.w / 2, px(7))) return s;
     } else if (s.type === "ellipse") {
       const c = ctr(s);
