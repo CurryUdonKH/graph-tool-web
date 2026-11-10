@@ -290,7 +290,7 @@ export function buildPlot(opt) {
   if (opt.ylabel) T({ x: P.x - tickOut - gap - 1 - yTickW - 6, y: P.y + P.h / 2, s: opt.ylabel, ha: "center", va: "bottom", rot: -90 });
   if (opt.title) T({ x: P.x + P.w / 2, y: P.y - 8 - offH, s: opt.title, size: fs * 1.2, ha: "center", va: "bottom" });
 
-  // 凡例(点や線と重ならない場所を選ぶ)
+  // 凡例。指定した位置に固定し、自動を選んだ場合だけ点や線を避ける。
   if (opt.legend && opt.series.length) {
     const hasLine = opt.series.some(s => s.line), sampleW = hasLine ? fs * 2 : MS + 4;
     const rowH = Math.max(lineH, MS + 4), pad = 6;
@@ -300,8 +300,10 @@ export function buildPlot(opt) {
       [P.x + P.w - lw - pad, P.y + pad], [P.x + pad, P.y + pad], [P.x + pad, P.y + P.h - lh - pad],
       [P.x + P.w - lw - pad, P.y + P.h - lh - pad], [P.x + (P.w - lw) / 2, P.y + pad], [P.x + (P.w - lw) / 2, P.y + P.h - lh - pad],
     ];
-    let best = cand[0], bestN = Infinity;
-    for (const [lx, ly] of cand) {
+    const positions = ["top-right", "top-left", "bottom-left", "bottom-right", "top-center", "bottom-center"];
+    const position = opt.legendPosition || "top-right";
+    let best = cand[Math.max(0, positions.indexOf(position))], bestN = Infinity;
+    for (const [lx, ly] of position === "auto" ? cand : []) {
       const hit = q => q.x >= lx - 4 && q.x <= lx + lw + 4 && q.y >= ly - 4 && q.y <= ly + lh + 4;
       const n = placed.filter(hit).length * 3 + linePts.filter(hit).length;
       if (n < bestN) { bestN = n; best = [lx, ly]; }

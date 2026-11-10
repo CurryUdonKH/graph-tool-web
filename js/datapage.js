@@ -223,28 +223,27 @@ export function createDataPage(cfg) {
   // ---------------------------------------------------------------- 軸・目盛りの設定欄
   page.axisHTML = series => {
     const st = page.S.st;
-    let h = `<label class="ck"><input type="checkbox" id="p_grid" ${st.grid ? "checked" : ""}>グリッド(目盛りの線)を表示</label>
-      <label class="ck" style="margin-bottom:10px"><input type="checkbox" id="p_sci" ${st.sci ? "checked" : ""}>目盛りの数字を指数表記にする(× 10ⁿ)</label>`;
+    let h = "";
     for (const [a, name] of [["x", "横軸"], ["y", "縦軸"]]) {
-      const o = st.axes[a];
-      const vals = series.flatMap(s => a === "x" ? s.xs : s.ys);
-      h += `<div class="card"><h4>${name}</h4>
-        <div class="grid2"><label class="ck"><input type="checkbox" data-a="${a}" data-k="log" ${o.log ? "checked" : ""}>対数目盛り</label>
-        <label class="ck"><input type="checkbox" data-a="${a}" data-k="auto" ${o.auto ? "checked" : ""}>範囲を自動</label></div>`;
+      const o = st.axes[a], vals = series.flatMap(s => a === "x" ? s.xs : s.ys);
+      const range = dataRange(vals, o.log);
+      if (!o.auto && (o.min == null || o.max == null)) [o.min, o.max] = range;
+      h += `<section class="card axis-settings"><h4>${name}（${a.toUpperCase()}）の範囲</h4>
+        <label class="fld2"><select aria-label="${name}の範囲の決め方" data-a="${a}" data-k="auto">${opts([["auto", "データに合わせる（自動）"], ["manual", "最小・最大を指定する"]], o.auto ? "auto" : "manual")}</select></label>
+        <div class="grid2"><label class="fld2"><span>最小値</span><input aria-label="${name}の最小値" type="number" step="any" data-a="${a}" data-k="min" value="${numVal(o.auto ? range[0] : o.min)}" ${o.auto ? "disabled" : ""}></label>
+        <label class="fld2"><span>最大値</span><input aria-label="${name}の最大値" type="number" step="any" data-a="${a}" data-k="max" value="${numVal(o.auto ? range[1] : o.max)}" ${o.auto ? "disabled" : ""}></label></div>`;
+      if (!o.auto) h += `<button class="btn" data-a="${a}" data-k="fitdata" title="最小・最大を、今のデータが全部入る範囲にします">現在のデータから範囲を入れる</button>`;
       if (o.log && vals.some(v => v <= 0)) h += `<div class="warn">0 以下の値は対数目盛りでは表示されません</div>`;
-      h += `<div class="grid2" style="grid-template-columns:3fr 2fr;margin-top:8px"><label class="fld2"><span>目盛りの数字</span>
+      h += `<details class="gear axis-format"><summary>目盛りの設定</summary><div>
+        <label class="ck"><input type="checkbox" data-a="${a}" data-k="log" ${o.log ? "checked" : ""}>対数目盛り</label>
+        <div class="grid2" style="grid-template-columns:3fr 2fr;margin-top:8px"><label class="fld2"><span>目盛りの数字</span>
         <select data-a="${a}" data-k="fmt">${opts([["auto", "自動"], ["dec", "小数点以下の桁数"], ["sig", "有効数字の桁数"]], o.fmt)}</select></label>
         <label class="fld2"><span>桁数</span><input type="number" min="${o.fmt === "dec" ? 0 : 1}" max="10" value="${o.digits}" data-a="${a}" data-k="digits" ${o.fmt === "auto" ? "disabled" : ""}></label></div>`;
       if (o.log && o.fmt !== "auto") h += `<div class="sub">対数目盛りでは 10ⁿ の形で表示するので、桁数の指定は使いません</div>`;
-      if (!o.auto) {
-        if (o.min == null || o.max == null) [o.min, o.max] = dataRange(vals, o.log);
-        h += `<div class="grid2"><label class="fld2"><span>最小</span><input type="number" step="any" data-a="${a}" data-k="min" value="${numVal(o.min)}"></label>
-          <label class="fld2"><span>最大</span><input type="number" step="any" data-a="${a}" data-k="max" value="${numVal(o.max)}"></label></div>
-          <button class="btn" data-a="${a}" data-k="fitdata" title="最小・最大を、今のデータが全部入る範囲にします">データに合わせる</button>`;
-      }
-      h += `</div>`;
+      h += `</div></details></section>`;
     }
-    return h;
+    return h + `<label class="ck"><input type="checkbox" id="p_grid" ${st.grid ? "checked" : ""}>グリッドを表示</label>
+      <label class="ck"><input type="checkbox" id="p_sci" ${st.sci ? "checked" : ""}>目盛りを指数表記にする（× 10ⁿ）</label>`;
   };
   function bindAxis(body, series) {
     const st = page.S.st, on = (sel, ev, fn) => body.querySelectorAll(sel).forEach(n => n.addEventListener(ev, fn));
@@ -253,7 +252,7 @@ export function createDataPage(cfg) {
     on("[data-a]", "change", e => {
       const t = e.target, o = st.axes[t.dataset.a], k = t.dataset.k;
       if (k === "log") { o.log = t.checked; o.min = o.max = null; page.changed(true); }
-      else if (k === "auto") { o.auto = t.checked; o.min = o.max = null; page.changed(true); }
+      else if (k === "auto") { o.auto = t.value === "auto"; page.changed(true); }
       else if (k === "fmt") { o.fmt = t.value; o.digits = t.value === "dec" ? 1 : 2; page.changed(true); }
       else if (k === "digits") { const v = Math.round(+t.value); if (v >= 0 && v <= 10) { o.digits = v; page.changed(); } }
     });

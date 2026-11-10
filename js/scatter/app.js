@@ -13,7 +13,7 @@ const FIG = { W: 504, H: 331, fontSize: 11 };   // 7 × 4.6 インチ(手元版�
 
 const defaultState = () => ({
   sel: {}, labels: {}, fit: true, fitAll: true, fitMin: null, fitMax: null,
-  xlabel: null, ylabel: null, title: "", grid: true, sci: false,
+  xlabel: null, ylabel: null, title: "", grid: true, sci: false, legendPosition: "top-right",
   axes: { x: defaultAxis(), y: defaultAxis() },
 });
 
@@ -56,7 +56,7 @@ function draw(page, series, warns, info) {
   if (!series.length) info.push("「データ」の欄で、縦軸 (y) の列を 1 つ以上選んでください");
   const { prims } = buildPlot({
     ...FIG, series, fits, xlabel: st.xlabel ?? autoXLabel(series), ylabel: st.ylabel ?? autoYLabel(series),
-    title: st.title, legend: series.length > 1, grid: st.grid, sci: st.sci,
+    title: st.title, legend: series.length > 1, legendPosition: st.legendPosition, grid: st.grid, sci: st.sci,
     axes: { x: axisOpt(st.axes.x, series.flatMap(s => s.xs), warns, "横軸"), y: axisOpt(st.axes.y, series.flatMap(s => s.ys), warns, "縦軸") },
   });
   if (!results.length) return { prims, ...FIG };
@@ -145,6 +145,7 @@ const panels = {
     let h = `<label class="fld2"><span>横軸のラベル</span><input type="text" id="p_xlabel" value="${esc(st.xlabel ?? autoXLabel(series))}"></label>
       <label class="fld2"><span>縦軸のラベル</span><input type="text" id="p_ylabel" value="${esc(st.ylabel ?? autoYLabel(series))}"></label>
       <label class="fld2"><span>タイトル(なしでもよい)</span><input type="text" id="p_title" value="${esc(st.title)}"></label>`;
+    if (series.length > 1) h += `<label class="fld2"><span>凡例の位置</span><select id="p_legend_position">${opts([["top-right", "右上に固定"], ["top-left", "左上に固定"], ["bottom-right", "右下に固定"], ["bottom-left", "左下に固定"], ["top-center", "上中央に固定"], ["bottom-center", "下中央に固定"], ["auto", "自動（点を避ける）"]], st.legendPosition)}</select></label>`;
     h += `<div class="fld2"><span>凡例の名前${series.length === 1 ? "(系列が 1 つのときは凡例を出しません)" : ""}</span>`;
     for (const s of series)
       h += `<label class="row" style="margin-bottom:6px;flex-wrap:nowrap"><span class="swatch" style="background:${s.color}"></span>
@@ -203,6 +204,7 @@ function bind(page, tab, body) {
   } else if (tab === "label") {
     on("#p_xlabel", "input", e => { st.xlabel = e.target.value; page.changed(); });
     on("#p_ylabel", "input", e => { st.ylabel = e.target.value; page.changed(); });
+    on("#p_legend_position", "change", e => { st.legendPosition = e.target.value; page.changed(); });
     on("#p_title", "input", e => { st.title = e.target.value; page.changed(); });
     on("[data-label]", "input", e => { st.labels[e.target.dataset.label] = e.target.value; page.changed(); });
     on("#p_math", "click", () => dialog("数式の書き方", MATH_HELP));
