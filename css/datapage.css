@@ -272,3 +272,45 @@ details.gear > div { padding: var(--size-8px) 0 var(--size-2px); }
 .rawgrid .raw-all { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 6px; }
 .rawgrid th.rn { position: sticky; left: 0; background: var(--surface); z-index: 1; }
 .rawbar input#raw_address { width: 260px; }
+
+/* 系列ごとに X と Y をひと組で見せるデータ欄 */
+.data-intro { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
+.data-intro h3 { margin: 0; font-size: var(--text-ui); }
+.data-intro > span { color: var(--muted); font-size: var(--text-small); }
+.source-title { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: var(--space-1); }
+.source-title > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--text-small); font-weight: 400; }
+.series-pair { padding: var(--space-3); margin-bottom: var(--space-2); background: var(--surface); border: 1px solid var(--line); border-radius: var(--size-4px); }
+.series-pair-heading { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.axis-tag { flex: none; color: var(--muted); font-size: var(--text-small); white-space: nowrap; }
+.series-pair-heading strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: var(--text-ui); font-weight: 600; }
+.series-remove { flex: none; width: 28px; height: 28px; border: 0; border-radius: var(--size-4px); background: transparent; color: var(--muted); cursor: pointer; font-size: 20px; }
+.series-remove:hover { color: var(--danger); background: var(--surface-soft); }
+.series-x-field { display: flex; align-items: center; gap: var(--space-2); }
+.series-x-field select, .series-add select { width: 100%; flex: 1; min-width: 0; font: inherit; font-size: var(--text-small); min-height: 34px; }
+.series-origin { display: block; margin-top: var(--space-2); color: var(--muted); overflow-wrap: anywhere; font-size: var(--text-small); }
+.series-add { display: flex; gap: var(--space-2); margin: var(--space-3) 0; }
+.series-add .btn { flex: none; min-height: 34px; }
+.source-tools { margin: var(--space-3) 0; }
+.source-tools .btn { width: 100%; }
+.data-help { margin-top: var(--space-4); }
+#tab_body .file-settings details.gear > summary { padding: var(--space-2) 0; }
+#tab_body :is(button, select, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 作業面ではグラフと要点だけを見せ、詳細は開いて確認する */
+#left { padding-top: var(--space-4); }
+#plot_stage { min-height: 0; }
+#below { margin-top: var(--space-4); }
+#fit_details, #data_box { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: var(--space-3) 0; background: transparent; }
+#fit_details > summary, #data_box > summary { cursor: pointer; font-size: var(--text-ui); font-weight: 500; }
+.result-detail-body { padding-top: var(--space-3); }
+#result_summary .result-series dl div:last-child { grid-column: auto; }
+.result-detail-button { border: 0; padding: var(--space-2) 0 0; margin-top: var(--space-2); background: transparent; color: var(--accent); font: inherit; font-size: var(--text-small); text-align: left; cursor: pointer; }
+.result-detail-button:hover { text-decoration: underline; }
+#data_sum { white-space: nowrap; }
+@media (max-width: 760px) {
+  #bar .doc { width: 100%; min-width: 0; flex-wrap: wrap; }
+  #bar #d_pick, #bar #d_name { flex: 1; width: 0; min-width: 100px; }
+  #bar #d_status { flex: none; }
+  #panel, #left { min-width: 0; }
+  #tab_body { max-height: 50vh; overflow-y: auto; }
+}

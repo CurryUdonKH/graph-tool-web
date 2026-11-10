@@ -109,7 +109,7 @@ export function createDataPage(cfg) {
   };
 
   // 読み込みの欄と、ファイルごとの ⚙(シート・飛ばす行数・取り外し)
-  page.dropHTML = () => `<button type="button" id="drop"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h6l2 2h8v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M12 11v6m-3-3h6"/></svg><span class="drop-copy"><strong>ファイルを選択</strong><span>Excel / CSV をドロップ・複数可</span></span></button>` + libraryHTML();
+  page.dropHTML = () => `<button type="button" id="drop"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h6l2 2h8v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M12 11v6m-3-3h6"/></svg><span class="drop-copy"><strong>＋ ファイルを追加</strong><span>Excel / CSV をドロップ・複数可</span></span></button>` + libraryHTML();
 
   // ---------------------------------------------------------------- ほかのグラフ・図で読み込んだファイルを使う
   // (手元版では、読み込んだファイルをどの画面でも使えた。その代わり)
@@ -130,7 +130,7 @@ export function createDataPage(cfg) {
     const mine = new Set(page.S.files.map(fileKey));
     const lib = page.library.filter(f => !mine.has(fileKey(f)));
     if (!lib.length) return "";
-    return `<details class="gear lib"><summary>📂 ほかのグラフ・図で読み込んだファイルを使う(${lib.length})</summary><div>
+    return `<details class="gear lib"><summary>読み込み済みのファイルから追加 (${lib.length})</summary><div>
       <select id="lib_pick" style="width:100%">${lib.map((f, i) => `<option value="${i}">${esc(f.name)}(${esc(f.from)})</option>`).join("")}</select>
       <button class="btn wide" id="lib_use" style="margin-top:6px">このファイルを使う</button>
       <div class="sub" style="margin-top:4px">ファイルを選び直さなくても、前に読み込んだものをそのまま使えます(表で直した所もそのまま)。</div></div></details>`;
@@ -148,9 +148,9 @@ export function createDataPage(cfg) {
     page.changed(true);
   }
   page.gearHTML = (f, fi) => {
-    let h = `<details class="gear"><summary>シート・行数・取り外し</summary><div>`;
+    let h = `<details class="gear"><summary>読み込み設定・取り外し</summary><div>`;
     if (f.excel && (f.sheets || []).length > 1)
-      h += `<label class="fld2"><span>シート</span><select data-f="${fi}" data-k="sheet">${opts(f.sheets.map(s => [s, s]), f.sheet)}</select></label>`;
+      h += `<label class="fld2"><span>このデータのシートを変更</span><select data-f="${fi}" data-k="sheet">${opts(f.sheets.map(s => [s, s]), f.sheet)}</select></label>`;
     if (f.range) h += `<div class="fld2"><span>使う範囲</span><b>${rangeLabel(f.range)}</b>(元のファイルで選んだ範囲${f.range.header ? "。1 行目が列の名前" : ""})</div>
       <div class="grid2" style="margin-bottom:8px"><button class="btn" data-f="${fi}" data-k="showraw">範囲を選び直す</button>
       <button class="btn" data-f="${fi}" data-k="unrange" title="列の名前の行を自動で探す読み方に戻します">自動に戻す</button></div>`;
@@ -158,10 +158,9 @@ export function createDataPage(cfg) {
       <div class="sub" style="margin:-4px 0 8px">表の上にタイトルやメモの行があるときに増やします。列の名前が書いてある行が一番上に来るようにしてください。(変えると、表で直した所は元に戻ります)</div>
       <button class="btn wide" style="margin-bottom:8px" data-f="${fi}" data-k="showraw">元のファイルを見て、範囲を選ぶ</button>`;
     h += `<button class="btn wide danger" data-f="${fi}" data-k="remove">このファイルを外す</button></div></details>`;
-    if (f.excel && f.sheet) h += `<p class="sub">使用中のシート：${esc(f.sheet)}</p>`;
     if (f.excel && (f.sheets || []).length > 1) {
-      h += `<div class="sheet-add"><label class="fld2"><span>別シートを重ねる</span><select data-f="${fi}" data-k="sheet-add-pick" aria-label="${esc(f.name)}から追加するシート">${opts(f.sheets.filter(s => s !== f.sheet).map(s => [s,s]), "")}</select></label>
-        <button class="btn wide" data-f="${fi}" data-k="sheet-add">このシートを追加</button><p class="sub">今のシートを残して追加します。シートごとに横軸と縦軸を選べます。</p></div>`;
+      h += `<details class="gear sheet-add"><summary>＋ 別シートを追加</summary><div><label class="fld2"><span>別シートを重ねる</span><select data-f="${fi}" data-k="sheet-add-pick" aria-label="${esc(f.name)}から追加するシート">${opts(f.sheets.filter(s => s !== f.sheet).map(s => [s,s]), "")}</select></label>
+        <button class="btn wide" data-f="${fi}" data-k="sheet-add">このシートを追加</button><p class="sub">今のシートを残して追加します。</p></div></details>`;
     }
     return h;
   };
@@ -275,7 +274,7 @@ export function createDataPage(cfg) {
   function renderDataTable() {
     const src = sources();
     $("data_box").hidden = !src.length;
-    $("data_sum").textContent = `(${src.length} ファイル。直しても元のファイルは変わりません)`;
+    $("data_sum").textContent = `(${src.length})`;
     if (page.dataTab >= src.length) page.dataTab = 0;
     $("data_tabs").innerHTML = src.map((f, i) => `<button data-i="${i}" class="${i === page.dataTab ? "on" : ""}">${esc(f.name)}</button>`).join("")
       + `<span class="sp"></span><div class="seg mode"><button data-mode="table" class="${page.dataMode === "table" ? "on" : ""}">グラフに使う表</button>`
