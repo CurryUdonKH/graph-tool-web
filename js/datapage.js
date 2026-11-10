@@ -1,3 +1,4 @@
+import { createSheetSource } from "./scatter/sheets.mjs";
 // Excel / CSV を読み込んでグラフを作るページ(散布図)に共通の部分:
 // ファイルの読み込みと ⚙ の設定、データの表、軸の設定欄、自動保存・一覧・開く・削除・書き出し。
 // ページごとにちがうところ(系列の作り方・グラフ・設定欄の中身)は cfg で受け取る。
@@ -140,7 +141,7 @@ export function createDataPage(cfg) {
     if (!f) return;
     let name = f.name, n = 2;
     while (page.S.files.some(x => x.name === name)) name = `${stem(f.name)} (${n++})${f.name.match(/\.[^.]+$/)?.[0] || ""}`;
-    const item = { name, excel: f.excel, raw: f.raw, sheet: f.sheet, skip: f.skip, range: f.range || null, sheets: f.sheets || [], table: clone(f.table) };
+    const item = { name, workbookName: f.workbookName || f.name, excel: f.excel, raw: f.raw, sheet: f.sheet, skip: f.skip, range: f.range || null, sheets: f.sheets || [], table: clone(f.table) };
     page.S.files.push(item);
     if (cfg.onFilesAdded) cfg.onFilesAdded(page, [name]);
     toast(`📁 「${name}」を使います`);
@@ -156,7 +157,13 @@ export function createDataPage(cfg) {
     else h += `<label class="fld2"><span>上から飛ばす行数</span><input type="number" min="0" max="100" value="${f.skip || 0}" data-f="${fi}" data-k="skip"></label>
       <div class="sub" style="margin:-4px 0 8px">表の上にタイトルやメモの行があるときに増やします。列の名前が書いてある行が一番上に来るようにしてください。(変えると、表で直した所は元に戻ります)</div>
       <button class="btn wide" style="margin-bottom:8px" data-f="${fi}" data-k="showraw">元のファイルを見て、範囲を選ぶ</button>`;
-    return h + `<button class="btn wide danger" data-f="${fi}" data-k="remove">このファイルを外す</button></div></details>`;
+    h += `<button class="btn wide danger" data-f="${fi}" data-k="remove">このファイルを外す</button></div></details>`;
+    if (f.excel && f.sheet) h += `<p class="sub">使用中のシート：${esc(f.sheet)}</p>`;
+    if (f.excel && (f.sheets || []).length > 1) {
+      h += `<div class="sheet-add"><label class="fld2"><span>別シートを重ねる</span><select data-f="${fi}" data-k="sheet-add-pick" aria-label="${esc(f.name)}から追加するシート">${opts(f.sheets.filter(s => s !== f.sheet).map(s => [s,s]), "")}</select></label>
+        <button class="btn wide" data-f="${fi}" data-k="sheet-add">このシートを追加</button><p class="sub">今のシートを残して追加します。シートごとに横軸と縦軸を選べます。</p></div>`;
+    }
+    return h;
   };
   page.howtoHTML = () => `<details class="gear"><summary>ファイルの作り方</summary><div class="sub">
     ・1 行目に列の名前(例:<code>時間 [s]</code>、<code>温度 [℃]</code>)<br>・2 行目から数値<br>・1 列に 1 種類のデータ<br>
@@ -167,6 +174,22 @@ export function createDataPage(cfg) {
     const drop = $("drop");
     if (drop) drop.onclick = () => $("f_data").click();
     if ($("lib_use")) $("lib_use").onclick = () => useLibrary(+$("lib_pick").value);
+    body.querySelectorAll("[data-k=sheet-add]").forEach(button => button.addEventListener("click", async () => {
+      const originalState = page.S, f = originalState.files[+button.dataset.f];
+      const sheet = body.querySelector(`[data-k="sheet-add-pick"][data-f="${button.dataset.f}"]`).value;
+      button.disabled = true;
+      try {
+        const rows = await readRows(f, sheet);
+        if (page.S !== originalState || !page.S.files.includes(f)) return;
+        const added = createSheetSource(f, sheet, rows, page.S.files.map(item => item.name));
+        page.S.files.push(added);
+        page.fileExpanded?.add(added.name);
+        if (cfg.onFilesAdded) cfg.onFilesAdded(page, [added.name]);
+        toast(`「${sheet}」を別のデータとして追加しました`);
+        page.changed(true);
+      } catch (err) { dialog("シートを追加できませんでした", `<p>${esc(err.message || err)}</p>`); }
+      finally { button.disabled = false; }
+    }));
     body.querySelectorAll("[data-k=sheet], [data-k=skip]").forEach(n => n.addEventListener("change", async e => {
       const t = e.target, f = page.S.files[+t.dataset.f];
       try {
@@ -473,7 +496,7 @@ export function createDataPage(cfg) {
     if (asNew) {
       let name = `${stem(f.name)} (${rangeLabel(range)})`, n = 2;
       while (page.S.files.some(x => x.name === name)) name = `${stem(f.name)} (${rangeLabel(range)}) ${n++}`;
-      target = { name, excel: f.excel, raw: f.raw, sheet: f.sheet, sheets: f.sheets, skip: 0, _rows: rows };
+      target = { name, workbookName: f.workbookName || f.name, excel: f.excel, raw: f.raw, sheet: f.sheet, sheets: f.sheets, skip: 0, _rows: rows };
       page.S.files.push(target);
       page.dataTab = page.S.files.length - 1;
     }
@@ -494,7 +517,7 @@ export function createDataPage(cfg) {
       if (!/\.(xlsx|xlsm|xls|csv|txt|tsv)$/i.test(file.name)) { toast(`「${file.name}」は Excel / CSV ではないようです`); continue; }
       let name = file.name, n = 2;
       while (S.files.some(f => f.name === name)) name = `${stem(file.name)} (${n++}).${file.name.split(".").pop()}`;
-      const item = { name, excel: isExcel(file.name), raw: await file.arrayBuffer(), sheet: null, skip: 0 };
+      const item = { name, workbookName: name, excel: isExcel(file.name), raw: await file.arrayBuffer(), sheet: null, skip: 0 };
       try {
         item.sheets = await sheetNames(item);
         item.sheet = item.sheets[0] || null;
@@ -558,7 +581,7 @@ export function createDataPage(cfg) {
     if (!rec) rec = { id: store.newId(), created: now };
     const renamed = rec.name !== name;
     Object.assign(rec, { name, updated: now, state: clone(S.st),
-      files: S.files.map(f => ({ name: f.name, excel: f.excel, raw: f.raw, sheet: f.sheet, skip: f.skip, range: f.range || null, sheets: f.sheets || [], table: clone(f.table) })) });
+      files: S.files.map(f => ({ name: f.name, workbookName: f.workbookName || f.name, excel: f.excel, raw: f.raw, sheet: f.sheet, skip: f.skip, range: f.range || null, sheets: f.sheets || [], table: clone(f.table) })) });
     await cfg.store.put(rec);
     S.id = rec.id; S.seen = now; S.sig = sigOf(name);
     if (document.activeElement !== $("d_name") && $("d_name").value.trim() !== name) $("d_name").value = name;
