@@ -32,6 +32,9 @@ export function computeScatterSeries(src, st) {
       }
       if (!xs.length) warns.push(`「${f.name} / ${y}」に横軸と縦軸が両方とも数値になる行がありません。`);
       const key = `${f.name}\u0000${y}`;
+      // 旧入力欄では HTML 内の区切り文字が置換され、別のキーに保存されていた。
+      const legacyKey = key.replaceAll("\u0000", "\ufffd");
+      if (!Object.hasOwn(st.labels, key) && Object.hasOwn(st.labels, legacyKey)) st.labels[key] = st.labels[legacyKey];
       const name = f.name.replace(/\.[^.]+$/,'');
       series.push({file:f.name,xFile:xfile.name,x,y,key,xs,ys,label:st.labels[key] ?? (src.length>1 ? `${name}: ${y}` : y)});
     }

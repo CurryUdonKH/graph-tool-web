@@ -149,7 +149,7 @@ const panels = {
     h += `<div class="fld2"><span>凡例の名前${series.length === 1 ? "(系列が 1 つのときは凡例を出しません)" : ""}</span>`;
     for (const s of series)
       h += `<label class="row" style="margin-bottom:6px;flex-wrap:nowrap"><span class="swatch" style="background:${s.color}"></span>
-        <input type="text" style="flex:1" data-label="${esc(s.key)}" value="${esc(s.label)}" title="${esc(s.file)} / ${esc(s.y)}"></label>`;
+        <input type="text" style="flex:1" data-label="${esc(JSON.stringify(s.key))}" value="${esc(s.label)}" title="${esc(s.file)} / ${esc(s.y)}"></label>`;
     return h + `</div><details class="gear"><summary>数式・単位の書き方</summary><div><div class="tip-box"><b>上付き・下付き・ギリシャ文字</b>は、LaTeX と同じように <code>$</code> で囲んで書きます。<br>
       例:<code>面積 [m$^2$]</code>、<code>$10^{-3}$</code>、<code>$T_{\\mathrm{max}}$</code>、<code>$\\alpha$</code>、<code>$\\Delta T$ [K]</code>、<code>電流 $I$ [$\\mu$A]</code>、<code>[$^\\circ$C]</code></div>
       <button class="btn" id="p_math">∑ 数式の書き方をもっと見る</button></div></details>`;
@@ -206,7 +206,7 @@ function bind(page, tab, body) {
     on("#p_ylabel", "input", e => { st.ylabel = e.target.value; page.changed(); });
     on("#p_legend_position", "change", e => { st.legendPosition = e.target.value; page.changed(); });
     on("#p_title", "input", e => { st.title = e.target.value; page.changed(); });
-    on("[data-label]", "input", e => { st.labels[e.target.dataset.label] = e.target.value; page.changed(); });
+    on("[data-label]", "input", e => { st.labels[JSON.parse(e.target.dataset.label)] = e.target.value; page.changed(); });
     on("#p_math", "click", () => dialog("数式の書き方", MATH_HELP));
   }
 }

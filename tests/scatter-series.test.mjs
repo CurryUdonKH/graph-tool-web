@@ -56,3 +56,16 @@ test('constructorなどの列名を個別横軸の設定と取り違えない',(
   assert.equal(out.warns.length,0);assert.equal(out.series.length,2);
   assert.deepEqual(out.series[1].ys,[3,6]);
 });
+
+
+test('入力しても反映されなかった旧凡例を復元し、新しい編集は優先する',()=>{
+  const src=[source('太陽電池.xlsx',['V','I','P'],[[1,2,3],[2,4,6]])];
+  const st=state({'太陽電池.xlsx':{x:'V',ys:['I','P']}});
+  st.labels['太陽電池.xlsx\ufffdI']='入力済みの電流';
+  st.labels['太陽電池.xlsx\ufffdP']='古い電力名';
+  st.labels['太陽電池.xlsx\u0000P']='現在の電力名';
+  assert.deepEqual(computeScatterSeries(src,st).series.map(s=>s.label),['入力済みの電流','現在の電力名']);
+  st.labels['太陽電池.xlsx\u0000I']='変更した電流';
+  const restored=JSON.parse(JSON.stringify(st));
+  assert.deepEqual(computeScatterSeries(src,restored).series.map(s=>s.label),['変更した電流','現在の電力名']);
+});
