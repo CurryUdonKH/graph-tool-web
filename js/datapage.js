@@ -1,3 +1,4 @@
+import { duplicateGraphRecord } from "./scatter/copy.mjs";
 import { createSheetSource } from "./scatter/sheets.mjs";
 // Excel / CSV を読み込んでグラフを作るページ(散布図)に共通の部分:
 // ファイルの読み込みと ⚙ の設定、データの表、軸の設定欄、自動保存・一覧・開く・削除・書き出し。
@@ -68,6 +69,7 @@ export function createDataPage(cfg) {
   page.renderPlot = () => {
     // ファイルを読み込むまでは、グラフの代わりに案内を出す
     const empty = !page.S.files.length;
+    if ($("f_dup")) $("f_dup").disabled = !!page.copying || (empty && !page.S.id);
     $("empty").hidden = !empty;
     $("plot_wrap").hidden = empty;
     if (empty) { $("warns").innerHTML = $("below").innerHTML = ""; const summary = $("result_summary"); if (summary) { summary.innerHTML = ""; summary.hidden = true; } page.last = { prims: [], series: [] }; return; }
@@ -560,7 +562,7 @@ export function createDataPage(cfg) {
     $("d_name").placeholder = page.S.id ? "" : `${page.S.defaultName}(ファイルを読み込むと自動で保存)`;
   }
 
-  let saveTimer = null;
+  let saveTimer = null, nameTimer = null;
   function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => queue(doSave), 400); }
   function flushSave() { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; return queue(doSave); } return chain; }
 
@@ -617,6 +619,38 @@ export function createDataPage(cfg) {
     await store.setSetting(cfg.lastKey, null);
     await refreshList();
   }
+  async function duplicateCurrent() {
+    if (page.copying || (!page.S.files.length && !page.S.id)) return;
+    const sourceState = page.S;
+    page.copying = true;
+    $("f_dup").disabled = true;
+    clearTimeout(nameTimer); clearTimeout(saveTimer); saveTimer = null;
+    try {
+      await queue(async () => {
+        // 自動保存の待ち時間内の編集・名前も、複製する前に確定する。
+        if (page.S !== sourceState) return;
+        await doSave();
+        const src = sourceState.id ? await cfg.store.get(sourceState.id) : null;
+        if (!src) throw new Error("複製するグラフが見つかりませんでした");
+        const rec = duplicateGraphRecord(src, {
+          id: store.newId(), now: store.nowISO(), names: (await cfg.store.list()).map(r => r.name),
+        });
+        await cfg.store.put(rec);
+        store.notify({ type: "saved", kind: cfg.kind, id: rec.id });
+        if (page.S === sourceState) {
+          loadState(rec);
+          await store.setSetting(cfg.lastKey, rec.id);
+          toast(`「${rec.name}」として複製しました。今はこちらを開いています`);
+        } else toast(`「${rec.name}」として複製しました`);
+        await refreshList();
+      });
+    } catch (e) {
+      await dialog("複製できませんでした", `<p>${esc(e.message || e)}</p><p>元のグラフはそのまま残っています。</p>`);
+    } finally {
+      page.copying = false;
+      $("f_dup").disabled = !page.S.files.length && !page.S.id;
+    }
+  }
   async function deleteCurrent() {
     if (!page.S.id) return;
     const name = currentName();
@@ -657,11 +691,11 @@ export function createDataPage(cfg) {
     addEventListener("drop", e => { e.preventDefault(); depth = 0; $("drop_cover").classList.remove("show"); if (e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]); });
 
     $("d_pick").onchange = e => e.target.value === "__new__" ? newRec() : openRec(e.target.value);
-    let nameTimer = null;
     $("d_name").addEventListener("input", () => { clearTimeout(nameTimer); nameTimer = setTimeout(scheduleSave, 300); });
     $("d_name").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) e.target.blur(); });
     $("d_delete").onclick = deleteCurrent;
     $("f_new").onclick = () => newRec();
+    $("f_dup").onclick = duplicateCurrent;
     $("d_export").onclick = () => doExport();
     bindMoreMenu({ beforeBackup: flushSave, onImported: refreshList });
     addEventListener("pagehide", () => flushSave());
