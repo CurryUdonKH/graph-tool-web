@@ -308,6 +308,10 @@ export function buildPlot(opt) {
       const n = placed.filter(hit).length * 3 + linePts.filter(hit).length;
       if (n < bestN) { bestN = n; best = [lx, ly]; }
     }
+    // グリッドやデータより前面、凡例の文字・記号より背面に描く。書き出しにも共通。
+    const framePad = 4;
+    prims.push({ k: "rect", x: best[0] - framePad, y: best[1] - framePad,
+      w: lw + framePad * 2, h: lh + framePad * 2, fill: "#ffffff", stroke: "#b3b3b3", lw: 0.6 });
     opt.series.forEach((s, i) => {
       const cy = best[1] + rowH * (i + 0.5), x0 = best[0], cx = x0 + sampleW / 2;
       if (s.line) prims.push({ k: "path", cmds: [["M", x0, cy], ["L", x0 + sampleW, cy]], lw: s.lw || 1.5, stroke: s.color, cap: "butt", dash: dashFor(s.line, s.lw || 1.5) });
