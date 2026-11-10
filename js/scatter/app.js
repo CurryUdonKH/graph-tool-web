@@ -2,11 +2,12 @@
 // ファイルの読み込み・自動保存・書き出しなどは datapage.js
 
 import * as store from "../store.js";
-import { numericColumns, column } from "./data.js";
+import { numericColumns } from "./data.js";
+import { computeScatterSeries, seriesXRef } from "./series.mjs";
 import { buildPlot, COLORS, MARKERS } from "./plot.js";
 import { linregress } from "./stats.js";
 import { esc, toast, dialog, MATH_HELP } from "../ui.js";
-import { createDataPage, axisOpt, g4, stem, opts, numVal, num, defaultAxis } from "../datapage.js";
+import { createDataPage, axisOpt, g4, opts, numVal, num, defaultAxis } from "../datapage.js";
 
 const FIG = { W: 504, H: 331, fontSize: 11 };   // 7 × 4.6 インチ(手元版と同じ)
 
@@ -18,29 +19,7 @@ const defaultState = () => ({
 
 // ---------------------------------------------------------------- 系列を組み立てる
 function computeSeries(page) {
-  const src = page.sources(), st = page.S.st, series = [], warns = [];
-  for (const f of src) {
-    const nums = numericColumns(f.table);
-    if (!nums.length) {
-      warns.push(`「${f.name}」に数値の列が見つかりません。表の上にタイトル行がある場合は、「データ」のファイル設定から「上から飛ばす行数」を増やしてみてください。`);
-      continue;
-    }
-    if (nums.length < 2) warns.push(`「${f.name}」は数値の列が 1 つしかありません。列の名前の行がずれているときは、「データ」のファイル設定から「上から飛ばす行数」を直してみてください。`);
-    let sel = st.sel[f.name];
-    if (!sel || !nums.includes(sel.x)) sel = st.sel[f.name] = { x: nums[0], ys: sel ? sel.ys : null };
-    if (!sel.ys) sel.ys = nums.filter(c => c !== sel.x).slice(0, 1);
-    sel.ys = sel.ys.filter(y => nums.includes(y) && y !== sel.x);
-    const xcol = column(f.table, sel.x);
-    for (const y of sel.ys) {
-      const ycol = column(f.table, y), xs = [], ys = [];
-      for (let i = 0; i < xcol.length; i++) {
-        if (Number.isFinite(xcol[i]) && Number.isFinite(ycol[i])) { xs.push(xcol[i]); ys.push(ycol[i]); }
-      }
-      const key = `${f.name}\u0000${y}`;
-      const auto = src.length > 1 ? `${stem(f.name)}: ${y}` : y;
-      series.push({ file: f.name, x: sel.x, y, key, xs, ys, label: st.labels[key] ?? auto });
-    }
-  }
+  const { series, warns } = computeScatterSeries(page.sources(), page.S.st);
   series.forEach((s, i) => { s.color = COLORS[i % COLORS.length]; s.marker = MARKERS[i % MARKERS.length]; });
   return { series, warns };
 }
@@ -105,21 +84,39 @@ const panels = {
   data(page) {
     const st = page.S.st;
     let h = page.dropHTML();
-    if (page.S.files.length) h += `<div class="sub" style="margin:-6px 0 12px">ファイルごとに横軸と縦軸を選びます。縦軸は複数選べ、全部が 1 枚に重なります。</div>`;
+    if (page.S.files.length) h += `<div class="sub" style="margin:-6px 0 12px">縦軸を複数選ぶと1枚に重なります。系列ごとに横軸を変えたり、別のファイル・範囲の横軸を使ったりできます。</div>`;
     let si = 0;
     if (!page.fileExpanded && page.sources().length) page.fileExpanded = new Set(page.sources().length === 1 ? [page.sources()[0].name] : []);
     page.sources().forEach((f, fi) => {
       const nums = numericColumns(f.table), sel = st.sel[f.name];
       h += `<details class="card file-card" data-name="${esc(f.name)}" ${page.fileExpanded?.has(f.name) ? "open" : ""}><summary><span class="file-name" title="${esc(f.name)}">${esc(f.name)}</span><span class="file-count">${sel ? `縦軸 ${sel.ys.length} 列` : "未選択"}</span></summary><div class="file-settings">` + page.gearHTML(f, fi);
       if (!nums.length || !sel) { h += `<div class="warn">数値の列が見つかりません</div></div></details>`; return; }
-      h += `<label class="fld2"><span>横軸 (x)</span><select data-f="${fi}" data-k="x">${opts(nums.map(c => [c, c]), sel.x)}</select></label>
+      h += `<label class="fld2"><span>共通の横軸 (x)</span><select data-f="${fi}" data-k="x">${opts(nums.map(c => [c, c]), sel.x)}</select></label>
         <div class="fld2"><span>縦軸 (y)<small>選ばない場合はこのファイルを使いません</small></span><div class="checks">`;
       for (const c of nums) {
-        if (c === sel.x) continue;
+        if (c === sel.x && nums.length > 1 && !seriesXRef(sel,c)) continue;
         const on = sel.ys.includes(c), color = on ? COLORS[si++ % COLORS.length] : "transparent";
         h += `<label><input type="checkbox" data-f="${fi}" data-k="y" value="${esc(c)}" ${on ? "checked" : ""}><span class="swatch" style="background:${color}"></span>${esc(c)}</label>`;
       }
-      h += `</div></div></div></details>`;
+      h += `</div></div>`;
+      if (sel.ys.length) {
+        h += `<div class="series-x-settings"><h4>系列ごとの横軸</h4><p class="sub">別データは先頭行から順に対応します。行の範囲は「元のファイル」で調整できます。</p>`;
+        for (const y of sel.ys) {
+          const ref = seriesXRef(sel,y), value = ref ? JSON.stringify([ref.source, ref.column]) : "";
+          const available = !ref || page.sources().some(src => src.name === ref.source && numericColumns(src.table).includes(ref.column));
+          h += `<label class="fld2"><span>${esc(y)} の横軸</span><select data-f="${fi}" data-k="series-x" data-y="${esc(y)}" aria-label="${esc(f.name)} / ${esc(y)} の横軸">`;
+          h += `<option value="" ${!ref ? "selected" : ""}>共通の横軸：${esc(sel.x)}</option>`;
+          if (!available) h += `<option value="${esc(value)}" selected>見つかりません：${esc(ref.source)} / ${esc(ref.column)}</option>`;
+          for (const src of page.sources()) {
+            const cols = numericColumns(src.table);
+            if (!cols.length) continue;
+            h += `<optgroup label="${esc(src.name)}">${opts(cols.map(c => [JSON.stringify([src.name,c]),c]),value)}</optgroup>`;
+          }
+          h += `</select>${ref ? `<small>使用元：${esc(ref.source)}</small>` : ""}</label>`;
+        }
+        h += `</div>`;
+      }
+      h += `</div></details>`;
     });
     return h + page.howtoHTML();
   },
@@ -158,9 +155,15 @@ function bind(page, tab, body) {
   const st = page.S.st, on = (sel, ev, fn) => body.querySelectorAll(sel).forEach(n => n.addEventListener(ev, fn));
   if (tab === "data") {
     on(".file-card", "toggle", e => { const el = e.currentTarget; if (!el.isConnected) return; if (el.open) page.fileExpanded.add(el.dataset.name); else page.fileExpanded.delete(el.dataset.name); });
+    on("[data-k=series-x]", "change", e => {
+      const t = e.target, f = page.sources()[+t.dataset.f], sel = st.sel[f.name];
+      if (!t.value) delete sel.xByY[t.dataset.y];
+      else { const [source,column] = JSON.parse(t.value); sel.xByY = {...sel.xByY, [t.dataset.y]:{source,column}}; }
+      page.changed(true);
+    });
     on("[data-k=x], [data-k=y]", "change", e => {
       const t = e.target, f = page.sources()[+t.dataset.f], sel = st.sel[f.name];
-      if (t.dataset.k === "x") { sel.x = t.value; sel.ys = sel.ys.filter(y => y !== t.value); }
+      if (t.dataset.k === "x") { sel.x = t.value; sel.ys = sel.ys.filter(y => y !== t.value || seriesXRef(sel,y)); }
       else {
         if (t.checked) sel.ys.push(t.value); else sel.ys.splice(sel.ys.indexOf(t.value), 1);
         const nums = numericColumns(f.table);
