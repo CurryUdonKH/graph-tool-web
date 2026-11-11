@@ -203,10 +203,11 @@ export function buildPlot(opt) {
   // 近似直線(点より後ろ)
   const linePts = [];
   for (const f of opt.fits || []) {
-    const pts = [], start = ax.x.log ? Math.max(f.x0, lim.x[0]) : f.x0;
-    if (!(start < f.x1)) continue;
+    // 計算に使った点の範囲とは別に、表示範囲いっぱいまで描いて枠で切る。
+    const pts = [], [start, end] = lim.x;
+    if (!(start < end)) continue;
     for (let i = 0; i <= 200; i++) {
-      const xv = ax.x.log ? 10 ** (Math.log10(start) + (Math.log10(f.x1) - Math.log10(start)) * i / 200) : start + (f.x1 - start) * i / 200;
+      const xv = ax.x.log ? 10 ** (Math.log10(start) + (Math.log10(end) - Math.log10(start)) * i / 200) : start + (end - start) * i / 200;
       const fitted = f.intercept + f.slope * (f.logX ? Math.log10(xv) : xv);
       const yv = f.logY ? 10 ** fitted : fitted;
       if (!Number.isFinite(yv) || (ax.y.log && yv <= 0)) { pts.push(null); continue; }

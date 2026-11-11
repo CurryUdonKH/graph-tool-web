@@ -51,3 +51,22 @@ test('対数回帰は逆変換して描き、対数座標では直線になる',
     }
   }
 });
+
+test('回帰直線は計算した点の範囲から表示範囲の両端まで伸ばす',()=>{
+  for(const log of [false,true]) {
+    const a=options();a.legend=false;
+    a.axes={x:{range:log?[1,1000]:[0,10],log},y:{range:log?[1,1000]:[0,10],log}};
+    a.fits=[{slope:1,intercept:0,x0:log?10:4,x1:log?100:6,color:'#abcdef',logX:log,logY:log}];
+    const result=buildPlot(a),paths=result.prims.filter(p=>p.k==='path'&&p.stroke==='#abcdef');
+    assert.equal(paths.length,1);
+    const first=paths[0].cmds[0],last=paths[0].cmds.at(-1),p=result.plot;
+    assert.ok(Math.abs(first[1]-p.x)<1e-8);assert.ok(Math.abs(last[1]-(p.x+p.w))<1e-8);
+    assert.ok(Math.abs(first[2]-(p.y+p.h))<1e-8);assert.ok(Math.abs(last[2]-p.y)<1e-8);
+  }
+});
+test('縦軸の範囲を先に超える回帰直線は上端と下端で切る',()=>{
+  const a=options();a.legend=false;a.fits=[{slope:2,intercept:-5,x0:4,x1:6,color:'#abcdef'}];
+  const result=buildPlot(a),path=result.prims.find(p=>p.k==='path'&&p.stroke==='#abcdef'),p=result.plot;
+  assert.ok(Math.abs(path.cmds[0][2]-(p.y+p.h))<1e-8);assert.ok(Math.abs(path.cmds.at(-1)[2]-p.y)<1e-8);
+  assert.ok(path.cmds.every(([,x,y])=>x>=p.x-1e-8&&x<=p.x+p.w+1e-8&&y>=p.y-1e-8&&y<=p.y+p.h+1e-8));
+});
