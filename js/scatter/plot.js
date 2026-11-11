@@ -203,11 +203,13 @@ export function buildPlot(opt) {
   // 近似直線(点より後ろ)
   const linePts = [];
   for (const f of opt.fits || []) {
-    const pts = [];
+    const pts = [], start = ax.x.log ? Math.max(f.x0, lim.x[0]) : f.x0;
+    if (!(start < f.x1)) continue;
     for (let i = 0; i <= 200; i++) {
-      const xv = ax.x.log ? 10 ** (Math.log10(f.x0) + (Math.log10(f.x1) - Math.log10(f.x0)) * i / 200) : f.x0 + (f.x1 - f.x0) * i / 200;
-      const yv = f.intercept + f.slope * xv;
-      if (ax.y.log && yv <= 0) { pts.push(null); continue; }
+      const xv = ax.x.log ? 10 ** (Math.log10(start) + (Math.log10(f.x1) - Math.log10(start)) * i / 200) : start + (f.x1 - start) * i / 200;
+      const fitted = f.intercept + f.slope * (f.logX ? Math.log10(xv) : xv);
+      const yv = f.logY ? 10 ** fitted : fitted;
+      if (!Number.isFinite(yv) || (ax.y.log && yv <= 0)) { pts.push(null); continue; }
       pts.push({ x: map("x", xv), y: map("y", yv) });
     }
     // 対数で 0 以下になる所は線を切る
@@ -230,7 +232,12 @@ export function buildPlot(opt) {
     }
     if (s.line) {
       const lw = s.lw || 1.5;
-      for (const seg of clipPolyline(vis, P)) {
+      const runs = [[]];
+      for (const v of vis) {
+        const run = runs[runs.length-1], previous = run[run.length-1];
+        if (previous && v.i !== previous.i + 1) runs.push([v]); else run.push(v);
+      }
+      for (const run of runs) for (const seg of clipPolyline(run, P)) {
         prims.push({ k: "path", cmds: pathOf(seg), lw, stroke: s.color, cap: s.line === "solid" ? "round" : "butt", dash: dashFor(s.line, lw) });
         linePts.push(...seg);
       }

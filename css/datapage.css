@@ -319,3 +319,12 @@ details.gear > div { padding: var(--size-8px) 0 var(--size-2px); }
 .axis-settings h4 { margin-bottom: var(--space-3); }
 
 .axis-log { margin-bottom: var(--space-3); }
+
+#tabs button[data-tab="theory"] { grid-column: 1 / -1; border-right: 0; }
+.theory-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--space-3); }
+.theory-heading .ck { margin:0; }
+.theory-style { display:flex; flex-wrap:wrap; gap:var(--space-3); align-items:center; }
+.theory-style label { display:flex; align-items:center; gap:var(--space-2); font-size:var(--text-small); }
+.theory-style input[type="color"] { width:40px; height:32px; padding:2px; border:1px solid var(--line); background:var(--surface); }
+
+.regression-equation { color:var(--muted); font-size:var(--text-small); line-height:1.5; margin:0 0 var(--space-3); overflow-wrap:anywhere; }

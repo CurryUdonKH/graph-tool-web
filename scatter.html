@@ -55,14 +55,15 @@
       <button data-tab="fit">回帰直線</button>
       <button data-tab="label">ラベル・数式</button>
       <button data-tab="axis">軸・目盛り</button>
+      <button data-tab="theory">理論曲線</button>
     </nav>
     <div id="tab_body"></div>
   </aside>
   <section id="left">
     <div id="empty" class="empty-state" hidden>
       <div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 10h18"/></svg></div>
-      <p><b>Excel / CSV を読み込んでください</b></p>
-      <p class="sub">「データ」の欄か、このページのどこかにファイルをドラッグしても読み込めます。<br>読み込むとグラフができて、自動で保存されます。</p>
+      <p><b>データや数式からグラフを作成</b></p>
+      <p class="sub">Excel / CSV を読み込むか、「理論曲線」に数式を入力してください。<br>作成したグラフは自動で保存されます。</p>
       <button class="btn primary" id="empty_pick">ファイルを選ぶ</button>
     </div>
     <div id="plot_stage"><div id="plot_wrap"><svg id="plot" xmlns="http://www.w3.org/2000/svg"></svg></div><aside id="result_summary" aria-label="回帰結果の要約" hidden></aside></div>

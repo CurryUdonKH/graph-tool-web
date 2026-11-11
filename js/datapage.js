@@ -61,14 +61,16 @@ export function createDataPage(cfg) {
     tab: "data", dataTab: 0, last: { prims: [], series: [] },
   };
   const sources = page.sources = () => page.S.files;
+  const hasContent = () => cfg.hasContent ? cfg.hasContent(page) : page.S.files.length > 0;
+  const axisValues = (series, a) => cfg.axisValues ? cfg.axisValues(page, series, a) : series.flatMap(s => a === "x" ? s.xs : s.ys);
   // ファイルの中身(行の並び)。保存はせず、使うときに読み直す
   const rowsOf = async f => f._rows || (f._rows = await readRows(f, f.sheet));
   const sigOf = name => JSON.stringify([name, page.S.st, page.S.files.map(f => [f.name, f.sheet, f.skip, f.range, f.table])]);
 
   // ---------------------------------------------------------------- 描く
   page.renderPlot = () => {
-    // ファイルを読み込むまでは、グラフの代わりに案内を出す
-    const empty = !page.S.files.length;
+    // データや理論曲線を追加するまでは、グラフの代わりに案内を出す
+    const empty = !hasContent();
     if ($("f_dup")) $("f_dup").disabled = !!page.copying || (empty && !page.S.id);
     $("empty").hidden = !empty;
     $("plot_wrap").hidden = empty;
@@ -227,7 +229,7 @@ export function createDataPage(cfg) {
     const st = page.S.st;
     let h = "";
     for (const [a, name] of [["x", "横軸"], ["y", "縦軸"]]) {
-      const o = st.axes[a], vals = series.flatMap(s => a === "x" ? s.xs : s.ys);
+      const o = st.axes[a], vals = axisValues(series, a);
       const range = dataRange(vals, o.log);
       if (!o.auto && (o.min == null || o.max == null)) [o.min, o.max] = range;
       h += `<section class="card axis-settings"><h4>${name}（${a.toUpperCase()}）</h4>
@@ -264,7 +266,7 @@ export function createDataPage(cfg) {
     });
     on("[data-k=fitdata]", "click", e => {
       const a = e.target.dataset.a, o = st.axes[a];
-      [o.min, o.max] = dataRange(series.flatMap(s => a === "x" ? s.xs : s.ys), o.log);
+      [o.min, o.max] = dataRange(axisValues(series, a), o.log);
       page.changed(true);
     });
   }
@@ -559,7 +561,7 @@ export function createDataPage(cfg) {
     loadLibrary().catch(e => console.error(e));
     // 名前を決めていない新しいものには、plot1、plot2 … のうち空いている番号の名前をつける(手元版と同じ)
     if (!page.S.id && !page.S.defaultName) page.S.defaultName = nextName(cfg.prefix, list.map(r => r.name));
-    $("d_name").placeholder = page.S.id ? "" : `${page.S.defaultName}(ファイルを読み込むと自動で保存)`;
+    $("d_name").placeholder = page.S.id ? "" : `${page.S.defaultName}(データや曲線を追加すると自動で保存)`;
   }
 
   let saveTimer = null, nameTimer = null;
@@ -569,7 +571,7 @@ export function createDataPage(cfg) {
   async function doSave() {
     saveTimer = null;
     const S = page.S;
-    if (!S.files.length && !S.id) return;          // まだ何も読み込んでいない新しいものは保存しない
+    if (!hasContent() && !S.id) return;          // まだ何も読み込んでいない新しいものは保存しない
     let name = currentName();
     if (sigOf(name) === S.sig) return;
     let rec = S.id ? await cfg.store.get(S.id) : null;
@@ -620,7 +622,7 @@ export function createDataPage(cfg) {
     await refreshList();
   }
   async function duplicateCurrent() {
-    if (page.copying || (!page.S.files.length && !page.S.id)) return;
+    if (page.copying || (!hasContent() && !page.S.id)) return;
     const sourceState = page.S;
     page.copying = true;
     $("f_dup").disabled = true;
@@ -648,7 +650,7 @@ export function createDataPage(cfg) {
       await dialog("複製できませんでした", `<p>${esc(e.message || e)}</p><p>元のグラフはそのまま残っています。</p>`);
     } finally {
       page.copying = false;
-      $("f_dup").disabled = !page.S.files.length && !page.S.id;
+      $("f_dup").disabled = !hasContent() && !page.S.id;
     }
   }
   async function deleteCurrent() {
@@ -667,8 +669,8 @@ export function createDataPage(cfg) {
   }
 
   async function doExport(fmt = null) {
-    if (!page.S.files.length) { toast("先に Excel / CSV を読み込んでください"); return; }
-    if (!page.last.series.length) { toast("縦軸の列を選んでください"); return; }
+    if (!hasContent()) { toast("データを読み込むか、理論曲線を追加してください"); return; }
+    if (!page.last.series.length) { toast("縦軸の列を選ぶか、理論曲線の数式を確認してください"); return; }
     const busy = setTimeout(() => $("busy").classList.add("show"), 250);
     try {
       await exportWithPreview(fmt, page.last.prims, currentName(), page.last.box, "画面のグラフをそのまま書き出します。",

@@ -32,3 +32,22 @@ test('任意の縦横範囲をそのまま使い、範囲外の点を描かな�
   assert.deepEqual(r.lim,{x:[-2,4],y:[10,20]}); assert.equal(points.length,2);
   assert.equal(points[0].cx,r.plot.x); assert.equal(points[1].cx,r.plot.x+r.plot.w);
 });
+
+test('理論曲線の定義域の途切れを線で結ばない',()=>{
+  const a=options();a.legend=false;a.series=[{xs:[1,2,3,4,5],ys:[1,2,NaN,4,5],line:'dashed',color:'#abcdef',marker:null,label:'理論'}];
+  const paths=buildPlot(a).prims.filter(p=>p.k==='path'&&p.stroke==='#abcdef');
+  assert.equal(paths.length,2);assert.ok(paths.every(p=>p.dash));
+});
+
+test('対数回帰は逆変換して描き、対数座標では直線になる',()=>{
+  for(const logX of [false,true]) {
+    const a=options();a.legend=false;a.axes={x:{range:logX?[1,100]:[0,2],log:logX},y:{range:[1,100],log:true}};
+    a.fits=[{slope:1,intercept:0,x0:logX?1:0,x1:logX?100:2,color:'#abcdef',logX,logY:true}];
+    const result=buildPlot(a),paths=result.prims.filter(p=>p.k==='path'&&p.stroke==='#abcdef');
+    assert.ok(paths.length>0);
+    for(const p of paths) for(const [,x,y] of p.cmds) {
+      const t=(x-result.plot.x)/result.plot.w;
+      assert.ok(Math.abs(y-(result.plot.y+result.plot.h*(1-t)))<1e-8);
+    }
+  }
+});
