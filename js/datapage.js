@@ -230,14 +230,14 @@ export function createDataPage(cfg) {
       const o = st.axes[a], vals = series.flatMap(s => a === "x" ? s.xs : s.ys);
       const range = dataRange(vals, o.log);
       if (!o.auto && (o.min == null || o.max == null)) [o.min, o.max] = range;
-      h += `<section class="card axis-settings"><h4>${name}（${a.toUpperCase()}）の範囲</h4>
+      h += `<section class="card axis-settings"><h4>${name}（${a.toUpperCase()}）</h4>
+        <label class="ck axis-log"><input type="checkbox" aria-label="${name}を対数目盛りにする" data-a="${a}" data-k="log" ${o.log ? "checked" : ""}>対数目盛り（10倍ずつ）</label>
         <label class="fld2"><select aria-label="${name}の範囲の決め方" data-a="${a}" data-k="auto">${opts([["auto", "データに合わせる（自動）"], ["manual", "最小・最大を指定する"]], o.auto ? "auto" : "manual")}</select></label>
         <div class="grid2"><label class="fld2"><span>最小値</span><input aria-label="${name}の最小値" type="number" step="any" data-a="${a}" data-k="min" value="${numVal(o.auto ? range[0] : o.min)}" ${o.auto ? "disabled" : ""}></label>
         <label class="fld2"><span>最大値</span><input aria-label="${name}の最大値" type="number" step="any" data-a="${a}" data-k="max" value="${numVal(o.auto ? range[1] : o.max)}" ${o.auto ? "disabled" : ""}></label></div>`;
       if (!o.auto) h += `<button class="btn" data-a="${a}" data-k="fitdata" title="最小・最大を、今のデータが全部入る範囲にします">現在のデータから範囲を入れる</button>`;
       if (o.log && vals.some(v => v <= 0)) h += `<div class="warn">0 以下の値は対数目盛りでは表示されません</div>`;
       h += `<details class="gear axis-format"><summary>目盛りの設定</summary><div>
-        <label class="ck"><input type="checkbox" data-a="${a}" data-k="log" ${o.log ? "checked" : ""}>対数目盛り</label>
         <div class="grid2" style="grid-template-columns:3fr 2fr;margin-top:8px"><label class="fld2"><span>目盛りの数字</span>
         <select data-a="${a}" data-k="fmt">${opts([["auto", "自動"], ["dec", "小数点以下の桁数"], ["sig", "有効数字の桁数"]], o.fmt)}</select></label>
         <label class="fld2"><span>桁数</span><input type="number" min="${o.fmt === "dec" ? 0 : 1}" max="10" value="${o.digits}" data-a="${a}" data-k="digits" ${o.fmt === "auto" ? "disabled" : ""}></label></div>`;

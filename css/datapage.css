@@ -317,3 +317,5 @@ details.gear > div { padding: var(--size-8px) 0 var(--size-2px); }
 
 .axis-format { margin-top: var(--space-3); }
 .axis-settings h4 { margin-bottom: var(--space-3); }
+
+.axis-log { margin-bottom: var(--space-3); }
