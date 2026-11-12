@@ -1,5 +1,5 @@
 import { duplicateGraphRecord } from "./scatter/copy.mjs";
-import { createSheetSource } from "./scatter/sheets.mjs";
+import { createSheetSource, createRangeSource } from "./scatter/sheets.mjs";
 // Excel / CSV を読み込んでグラフを作るページ(散布図)に共通の部分:
 // ファイルの読み込みと ⚙ の設定、データの表、軸の設定欄、自動保存・一覧・開く・削除・書き出し。
 // ページごとにちがうところ(系列の作り方・グラフ・設定欄の中身)は cfg で受け取る。
@@ -214,6 +214,7 @@ export function createDataPage(cfg) {
       toast("列の名前の行を自動で探す読み方に戻しました");
       page.changed(true);
     }));
+    body.querySelectorAll("[data-k=range-add]").forEach(n => n.addEventListener("click", e => showRaw(page.S.files[+e.currentTarget.dataset.f], true)));
     body.querySelectorAll("[data-k=showraw]").forEach(n => n.addEventListener("click", e => showRaw(page.S.files[+e.target.dataset.f])));
     body.querySelectorAll("[data-k=remove]").forEach(n => n.addEventListener("click", e => {
       const f = page.S.files[+e.target.dataset.f];
@@ -282,8 +283,8 @@ export function createDataPage(cfg) {
     $("data_tabs").innerHTML = src.map((f, i) => `<button data-i="${i}" class="${i === page.dataTab ? "on" : ""}">${esc(f.name)}</button>`).join("")
       + `<span class="sp"></span><div class="seg mode"><button data-mode="table" class="${page.dataMode === "table" ? "on" : ""}">グラフに使う表</button>`
       + `<button data-mode="raw" class="${page.dataMode === "raw" ? "on" : ""}" title="元のファイルをそのまま見て、グラフに使う範囲をマウスで選べます">元のファイル</button></div>`;
-    $("data_tabs").querySelectorAll("[data-i]").forEach(b => b.onclick = () => { page.dataTab = +b.dataset.i; sel = null; renderDataTable(); });
-    $("data_tabs").querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { page.dataMode = b.dataset.mode; renderDataTable(); });
+    $("data_tabs").querySelectorAll("[data-i]").forEach(b => b.onclick = () => { page.dataTab = +b.dataset.i; sel = null; addingRange = false; renderDataTable(); });
+    $("data_tabs").querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { page.dataMode = b.dataset.mode; addingRange = false; renderDataTable(); });
     const f = src[page.dataTab];
     if (!f) { $("data_table").innerHTML = ""; return; }
     if (page.dataMode === "raw") return renderRaw(f);
@@ -322,12 +323,14 @@ export function createDataPage(cfg) {
 
   // ---------------------------------------------------------------- 元のファイルを Excel のように見て、範囲を選ぶ
   let sel = null;          // 選んでいる範囲 { r0, c0, r1, c1, header, rows?, cols? }
+  let addingRange = false; // 元のデータを残して、別の範囲を追加する
   let addSelection = false; // キーを押さずに離れた列・行を選ぶ
   let drag = null;         // ドラッグを始めた所 { ar, ac }
   addEventListener("mouseup", () => { drag = null; });
   addEventListener("blur", () => { drag = null; });
-  function showRaw(f) {
-    page.dataTab = sources().indexOf(f); page.dataMode = "raw"; sel = f.range ? { ...f.range } : null;
+  function showRaw(f, asNew = false) {
+    addingRange = asNew; addSelection = false;
+    page.dataTab = sources().indexOf(f); page.dataMode = "raw"; sel = !asNew && f.range ? clone(f.range) : null;
     $("data_box").open = true;
     renderDataTable();
     $("data_box").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -335,7 +338,7 @@ export function createDataPage(cfg) {
   const norm = q => ({ r0: Math.min(q.ar, q.br), r1: Math.max(q.ar, q.br), c0: Math.min(q.ac, q.bc), c1: Math.max(q.ac, q.bc) });
 
   async function renderRaw(f) {
-    if (!sel && f.range) sel = { ...f.range };
+    if (!addingRange && !sel && f.range) sel = clone(f.range);
     const rows = await rowsOf(f);
     const MAXR = 2000, nr = Math.min(rows.length, MAXR);
     const nc = Math.max(1, ...rows.slice(0, nr).map(r => (r || []).length));
@@ -381,7 +384,7 @@ export function createDataPage(cfg) {
     };
     const bar = () => {
       const n = sel ? `<b>${rangeLabel(sel)}</b>(${sel.rows?.length ?? sel.r1 - sel.r0 + 1} 行 × ${sel.cols?.length ?? sel.c1 - sel.c0 + 1} 列)` : "まだ選んでいません";
-      $("rawbar").innerHTML = `<div class="sub">ドラッグで範囲選択。⌘ / Ctrl を押しながら別の範囲を追加、Shift で選択を拡張できます。矢印キーで移動、⌘ / Ctrl＋C でコピー。
+      $("rawbar").innerHTML = `${addingRange ? `<p><b>${esc(f.sheet || f.name)}の別範囲を追加</b> — 今のグラフを残して重ねます。</p>` : ""}<div class="sub">ドラッグで範囲選択。⌘ / Ctrl を押しながら別の範囲を追加、Shift で選択を拡張できます。矢印キーで移動、⌘ / Ctrl＋C でコピー。
           ${f.range ? `今使っている範囲は <span class="usedmark">${rangeLabel(f.range)}</span> です。` : "今は、列の名前の行を自動で探して読んでいます。"}</div>
         <div class="row" style="margin-top:6px"><label>セル範囲 <input id="raw_address" type="text" aria-label="セル範囲" placeholder="例: A1:A10, C1:C10" value="${sel ? esc(sel.areas ? rangeLabel(sel) : `${colLetter(sel.c0)}${sel.r0 + 1}:${colLetter(sel.c1)}${sel.r1 + 1}`) : ""}"></label>
           <button class="btn" id="raw_select">範囲を選択</button><span id="raw_address_error" role="status"></span></div>
@@ -389,9 +392,10 @@ export function createDataPage(cfg) {
           <label class="ck" style="margin-left:8px"><input type="checkbox" id="raw_head" ${!sel || sel.header !== false ? "checked" : ""}>選んだ最初の行を列の名前にする</label></div>
         <div class="row" style="margin-top:6px">
           <button class="btn" id="raw_copy" ${sel ? "" : "disabled"}>選択範囲をコピー</button>
-          <button class="btn primary" id="raw_use" ${sel ? "" : "disabled"}>この範囲をグラフに使う</button>
-          <button class="btn" id="raw_add" ${sel ? "" : "disabled"} title="1 つのシートに表がいくつも並んでいるときに。別のデータとして重ねて描けます">この範囲を別のデータとして追加</button>
-          ${f.range ? `<button class="btn" id="raw_auto">自動に戻す</button>` : ""}</div>`;
+          ${!addingRange ? `<button class="btn primary" id="raw_use" ${sel ? "" : "disabled"}>この範囲をグラフに使う</button>` : ""}
+          <button class="btn${addingRange ? " primary" : ""}" id="raw_add" ${sel ? "" : "disabled"} title="1 つのシートに表がいくつも並んでいるときに。別のデータとして重ねて描けます">この範囲を別のデータとして追加</button>
+          ${addingRange ? `<button class="btn" id="raw_cancel">追加をやめる</button>` : ""}
+          ${f.range && !addingRange ? `<button class="btn" id="raw_auto">自動に戻す</button>` : ""}</div>`;
       $("raw_multi").onchange = e => { addSelection = e.target.checked; };
       $("raw_head").onchange = e => { if (sel) sel.header = e.target.checked; };
       const selectAddress = () => {
@@ -406,7 +410,8 @@ export function createDataPage(cfg) {
       $("raw_select").onclick = selectAddress;
       $("raw_address").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); selectAddress(); } };
       $("raw_copy").onclick = copySelection;
-      $("raw_use").onclick = () => useRange(f, false);
+      if ($("raw_use")) $("raw_use").onclick = () => useRange(f, false);
+      if ($("raw_cancel")) $("raw_cancel").onclick = () => showRaw(f);
       $("raw_add").onclick = () => useRange(f, true);
       if ($("raw_auto")) $("raw_auto").onclick = async () => {
         f.range = null; f.skip = guessSkip(rows); f.table = buildTable(rows, f); sel = null;
@@ -493,12 +498,12 @@ export function createDataPage(cfg) {
     const range = { r0: sel.r0, c0: sel.c0, r1: sel.r1, c1: sel.c1, header: sel.header !== false,
       ...(sel.rows ? { rows: [...sel.rows] } : {}), ...(sel.cols ? { cols: [...sel.cols] } : {}),
       ...(sel.areas ? {areas: clone(sel.areas)} : {}) };
+    const originalState = page.S;
     const rows = await rowsOf(f);
+    if (page.S !== originalState || !page.S.files.includes(f)) return;
     let target = f;
     if (asNew) {
-      let name = `${stem(f.name)} (${rangeLabel(range)})`, n = 2;
-      while (page.S.files.some(x => x.name === name)) name = `${stem(f.name)} (${rangeLabel(range)}) ${n++}`;
-      target = { name, workbookName: f.workbookName || f.name, excel: f.excel, raw: f.raw, sheet: f.sheet, sheets: f.sheets, skip: 0, _rows: rows };
+      target = createRangeSource(f, rows, range, page.S.files.map(item => item.name));
       page.S.files.push(target);
       page.dataTab = page.S.files.length - 1;
     }
@@ -508,7 +513,7 @@ export function createDataPage(cfg) {
     if (!t.numeric.some(Boolean)) toast("選んだ範囲に数値の列が見つかりません。範囲や「選んだ最初の行を列の名前にする」を見直してください");
     else toast(asNew ? `「${target.name}」として追加しました` : `${rangeLabel(range)} をグラフに使います`);
     if (cfg.onFilesAdded && asNew) cfg.onFilesAdded(page, [target.name]);
-    sel = { ...range };
+    sel = clone(range); addingRange = false;
     page.changed(true);
   }
 
@@ -594,7 +599,7 @@ export function createDataPage(cfg) {
   }
 
   function loadState(rec) {
-    sel = null; drag = null; addSelection = false;
+    sel = null; drag = null; addSelection = false; addingRange = false;
     const st = rec ? { ...cfg.defaultState(), ...clone(rec.state) } : cfg.defaultState();
     st.axes = { x: { ...defaultAxis(), ...(st.axes || {}).x }, y: { ...defaultAxis(), ...(st.axes || {}).y } };
     if (cfg.fixState) cfg.fixState(st);

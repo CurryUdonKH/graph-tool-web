@@ -2,7 +2,7 @@
 // ファイルの読み込み・自動保存・書き出しなどは datapage.js
 
 import * as store from "../store.js";
-import { numericColumns } from "./data.js";
+import { numericColumns, rangeLabel } from "./data.js";
 import { computeScatterSeries, seriesXRef } from "./series.mjs";
 import { buildTheorySeries } from "./theory.mjs";
 import { buildPlot, dataRange, COLORS, MARKERS } from "./plot.js";
@@ -111,7 +111,7 @@ const panels = {
     if (!page.fileExpanded && sources.length) page.fileExpanded = new Set(sources.slice(0, 3).map(f => f.name));
     sources.forEach((f, fi) => {
       const nums = numericColumns(f.table), sel = st.sel[f.name];
-      const sourceTitle = f.sheet || f.name;
+      const sourceTitle = (f.sheet || f.name) + (f.range ? ` · ${rangeLabel(f.range)}` : "");
       h += `<details class="card file-card" data-name="${esc(f.name)}" ${page.fileExpanded?.has(f.name) ? "open" : ""}><summary><span class="source-title"><span class="file-name" title="${esc(sourceTitle)}">${esc(sourceTitle)}</span>${f.sheet ? `<small title="${esc(f.name)}">${esc(f.name)}</small>` : ""}</span><span class="file-count">${sel?.ys.length || 0} 系列</span></summary><div class="file-settings">`;
       if (!nums.length || !sel) h += `<div class="warn">数値の列が見つかりません。読み込み設定を確認してください。</div>`;
       else {
@@ -134,6 +134,7 @@ const panels = {
         if (remaining.length) h += `<div class="series-add"><select data-f="${fi}" data-k="series-add-pick" aria-label="${esc(f.name)}で追加する縦軸"><option value="">縦軸の列を選択…</option>${opts(remaining.map(c => [c,c]), "")}</select><button type="button" class="btn" data-f="${fi}" data-k="series-add" disabled>＋ 追加</button></div>`;
         if (!sel.ys.length) h += `<p class="sub">縦軸を追加すると、グラフに表示されます。</p>`;
       }
+      h += `<button class="btn wide" data-f="${fi}" data-k="range-add">＋ ${f.excel ? "同じシート" : "同じファイル"}の別範囲を追加</button>`;
       h += `<details class="gear source-options"><summary>${f.excel ? "シート・範囲・読み込み設定" : "範囲・読み込み設定"}</summary><div><div class="source-tools"><button class="btn" data-f="${fi}" data-k="showraw">表・範囲を選ぶ</button></div>` + page.gearHTML(f, fi);
       if (sel && nums.length) h += `<details class="gear"><summary>共通の横軸を変更</summary><div><label class="fld2"><span>このデータの基本の横軸</span><select data-f="${fi}" data-k="x">${opts(nums.map(c => [c,c]), sel.x)}</select></label><p class="sub">個別に横軸を選んだ系列は、その指定を保ちます。</p></div></details>`;
       h += `</div></details></div></details>`;
