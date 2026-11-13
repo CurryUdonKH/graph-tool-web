@@ -274,3 +274,16 @@ svg#svg { display: block; user-select: none; }
   #palette .tool { min-height: 52px; }
   .palette-search input { padding: var(--space-1); font-size: var(--text-small); }
 }
+
+/* 作図面は固定サイズの表示窓。移動は座標で管理し、巨大なスクロール領域を作らない。 */
+#wrap { overflow: hidden; overscroll-behavior: none; }
+
+.locate-search { display: grid; gap: var(--space-1); margin-bottom: var(--space-3); }
+.locate-search input { width: 100%; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius); font: inherit; }
+.locate-list { max-height: 50vh; overflow: auto; display: grid; gap: var(--space-1); }
+.locate-part { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.locate-part b, .locate-part small { display: block; overflow-wrap: anywhere; }
+.locate-part small, .locate-id { color: var(--muted); font-size: var(--text-small); }
+.locate-part:hover, .locate-part:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+.locate-part[hidden] { display: none; }
+.locate-id { flex-shrink: 0; }

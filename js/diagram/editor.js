@@ -1,9 +1,10 @@
+import { worldPoint, zoomView, panView, fitView } from "./viewport.mjs";
 import { attachCircuitEnds, circuitEditHandles } from "./circuit-edit.mjs";
 import { cleanupCircuitJunctions } from "./circuit-cleanup.mjs";
 import { pointPrimitives, resizePoint } from "./coordinate-point.mjs";
 import { paintOrder, reorderedItems } from "./stacking.mjs";
 import { imagePrimitive, resizeImage, readPlacedImage } from "./placed-image.mjs";
-import { toast, esc } from "../ui.js";
+import { toast, esc, dialog } from "../ui.js";
 import { snapToGuides } from "./snap.mjs";
 import { isWire, migrateWireTypes } from "./wiretypes.mjs";
 import { remapStyles } from "./textstyles.mjs";
@@ -55,9 +56,9 @@ const W = 1600, H = 1000;
 
 const S = {
   doc: newDoc(), sel: [], tool: "select", hist: [], fut: [],
-  drag: null, draft: null, guides: [], editing: null, clip: null, mouse: { x: 0, y: 0 }, zoom: 1,
+  drag: null, draft: null, guides: [], editing: null, clip: null, mouse: { x: 0, y: 0 }, zoom: 1, view: {x:0,y:0},
 };
-try { S.zoom = Math.min(4, Math.max(0.25, +localStorage.getItem("diagram_zoom") || 1)); } catch (e) {}
+try { S.zoom = Math.min(4, Math.max(0.01, +localStorage.getItem("diagram_zoom") || 1)); } catch (e) {}
 const px = v => v / S.zoom;   // 画面上で同じ大きさに見えるように(つまみ・当たり判定など)
 function newDoc() { return { grid: 20, snap: true, snapEdge: true, showGrid: true, W, H, items: [], nextId: 1 }; }
 const LINE_LW = 1.5;   // 新しく作る線の標準の太さ
@@ -651,20 +652,10 @@ function drawText(p, parent) {   // 文字と $...$ の数式(並べ方は text.
   for (const er of L.errors) if (!S.mathErr.some(x => x.tex === er.tex)) S.mathErr.push(er);
   el("g", {}, parent).innerHTML = textMarkup(L, p.x, p.y);
 }
-// 描ける広さ:決めた大きさ(W×H)より、描いたものの右下に余白を足した所や、見えている所が広ければそこまで広げる。
-// 右や下へ図形を動かすと、そのぶんグリッドも続く(図には保存しない。書き出す範囲は描いたものだけ)
+// SVG は画面の大きさに固定し、表示する座標だけを動かす。負の座標も描ける。
 function viewSize() {
-  const d = S.doc, wr = $("wrap");
-  let mx = 0, my = 0;
-  const add = (x, y) => { if (x > mx) mx = x; if (y > my) my = y; };
-  for (const it of d.items) {
-    if (isShape(it)) add(it.x + it.w, it.y + it.h);
-    else { for (const e of [it.from, it.to]) if (e && e.id == null) add(e.x, e.y); for (const q of it.points || []) add(q.x, q.y); }
-  }
-  const step = d.grid * 5, up = v => Math.ceil(v / step) * step;
-  // 見えている所ぴったりまで(切り上げると、縮小したときにいらないスクロールバーが出るため)
-  return { w: Math.max(up(Math.max(d.W, mx + 800)), wr ? Math.floor(wr.clientWidth / S.zoom) : 0),
-           h: Math.max(up(Math.max(d.H, my + 600)), wr ? Math.floor(wr.clientHeight / S.zoom) : 0) };
+  const wr = $("wrap");
+  return {x:S.view.x, y:S.view.y, w:Math.max(1,wr.clientWidth)/S.zoom, h:Math.max(1,wr.clientHeight)/S.zoom};
 }
 function render() {
   svg.innerHTML = "";
@@ -672,7 +663,7 @@ function render() {
   const d = S.doc, vs = viewSize();
   S.vw = vs.w; S.vh = vs.h;
   svg.setAttribute("width", vs.w * S.zoom); svg.setAttribute("height", vs.h * S.zoom);
-  svg.setAttribute("viewBox", `0 0 ${vs.w} ${vs.h}`);
+  svg.setAttribute("viewBox", `${vs.x} ${vs.y} ${vs.w} ${vs.h}`);
   if (d.showGrid) {
     const defs = el("defs", {});
     const pat = el("pattern", { id: "grid", width: d.grid * 5, height: d.grid * 5, patternUnits: "userSpaceOnUse" }, defs);
@@ -681,7 +672,7 @@ function render() {
       el("line", { x1: v, y1: 0, x2: v, y2: d.grid * 5, stroke: c, "stroke-width": 1 }, pat);
       el("line", { x1: 0, y1: v, x2: d.grid * 5, y2: v, stroke: c, "stroke-width": 1 }, pat);
     }
-    el("rect", { x: 0, y: 0, width: vs.w, height: vs.h, fill: "url(#grid)" });
+    el("rect", { x: vs.x, y: vs.y, width: vs.w, height: vs.h, fill: "url(#grid)" });
   }
   const u = d.underlay;
   if (u && u.src && u.visible !== false)
@@ -1049,7 +1040,7 @@ function commit() {
 }   // つなぎ直しは操作が終わったときだけ
 
 // ------------------------------------------------------------------ マウス
-const ptOf = ev => { const r = svg.getBoundingClientRect(); return { x: (ev.clientX - r.left) / S.zoom, y: (ev.clientY - r.top) / S.zoom }; };
+const ptOf = ev => { const r = svg.getBoundingClientRect(); return worldPoint(S.view, S.zoom, ev.clientX - r.left, ev.clientY - r.top); };
 // ---- 配線:途中からの分岐と、縦横の自動ルート
 // 配線かどうか:「配線」で引いた線と、ゲートや接続点につながった矢印なしの直角線
 // 配線かどうか:「配線」で引いた線と、矢印のない直線・直角線(曲線や矢印つきの線は図形の縁につなぐ「矢印」扱い)
@@ -1323,7 +1314,8 @@ let lastDown = null, circuitCompleted = null;
 svg.addEventListener("mousedown", ev => {
   if (ev.button === 1 || (ev.button === 0 && S.space)) {   // スペース+ドラッグ / ホイールを押してドラッグ → 画面を動かす
     ev.preventDefault();
-    S.drag = { kind: "pan", sx: ev.clientX, sy: ev.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
+    closeEditor(true);
+    S.drag = { kind: "pan", sx: ev.clientX, sy: ev.clientY, view: {...S.view} };
     setCursor("grabbing"); return;
   }
   if (ev.button !== 0) return;
@@ -1423,7 +1415,8 @@ svg.addEventListener("mousedown", ev => {
 });
 window.addEventListener("mousemove", ev => {
   if (S.drag && S.drag.kind === "pan") {
-    wrap.scrollLeft = S.drag.sl - (ev.clientX - S.drag.sx); wrap.scrollTop = S.drag.st - (ev.clientY - S.drag.sy);
+    S.view = panView(S.drag.view, S.zoom, S.drag.sx - ev.clientX, S.drag.sy - ev.clientY);
+    render();
     return;
   }
   S.mouse = ptOf(ev); S.circuitFree = S.tool === "circuit-wire" && ev.altKey;
@@ -1603,8 +1596,8 @@ function dragMoveInner(d, p) {
         const result = snapToGuides({ x: s0.x + dx, y: s0.y + dy }, { x: tx, y: ty }, s0,
           shapes().filter(s => !sel.has(s.id)), px(7));
         tx = result.x; ty = result.y;
-        if (result.guideX != null) S.guides.push({ x1: result.guideX, y1: 0, x2: result.guideX, y2: S.vh || S.doc.H });
-        if (result.guideY != null) S.guides.push({ x1: 0, y1: result.guideY, x2: S.vw || S.doc.W, y2: result.guideY });
+        if (result.guideX != null) S.guides.push({ x1: result.guideX, y1: S.view.y, x2: result.guideX, y2: S.view.y + S.vh });
+        if (result.guideY != null) S.guides.push({ x1: S.view.x, y1: result.guideY, x2: S.view.x + S.vw, y2: result.guideY });
       }
       dx = tx - s0.x; dy = ty - s0.y;
     } else { dx = snapV(dx); dy = snapV(dy); }
@@ -1869,7 +1862,7 @@ function openEditor(it) {
   }
   else { const g = edgeGeom(it); size = it.fontSize; w = 180; h = size * 1.6 + 8; x = g.label.x - w / 2; y = g.label.y - h / 2; text = it.label || ""; }
   const z = S.zoom;
-  Object.assign(ta.style, { display: "block", left: x * z + "px", top: y * z + "px", width: Math.max(w * z, 80) + "px",
+  Object.assign(ta.style, { display: "block", left: (x - S.view.x) * z + "px", top: (y - S.view.y) * z + "px", width: Math.max(w * z, 80) + "px",
     height: h * z + "px", fontSize: size * z + "px", textAlign: isShape(it) ? textAlign(it)[0] : "center" });
   ta.value = text;
   S.editing = it.id;
@@ -2505,7 +2498,7 @@ function updateUI() {
   $("g_show").checked = S.doc.showGrid; $("g_snap").checked = S.doc.snap; $("g_edge_snap").checked = S.doc.snapEdge; $("g_size").value = String(S.doc.grid);
   $("b_undo").disabled = !S.hist.length; $("b_redo").disabled = !S.fut.length;
   $("b_dup").disabled = $("b_del").disabled = !S.sel.length;
-  $("zpct").textContent = Math.round(S.zoom * 100) + "%";
+  $("zpct").textContent = Number((S.zoom * 100).toPrecision(3)) + "%";
   const key = JSON.stringify(selItems()) + "|" + (S.doc.underlay ? [S.doc.underlay.visible, !!S.underEdit].join() : "");
   if (key !== lastPropsKey && !S.drag) { lastPropsKey = key; $("side").innerHTML = sideHTML(selItems()); bindSide(); }
   if (S.circuitError) { $("hint").textContent = S.circuitError; return; }
@@ -2557,15 +2550,17 @@ function setZoom(z, cx, cy) {     // (cx, cy) は画面上で動かさない点(
   const r = wrap.getBoundingClientRect();
   if (cx == null) { cx = r.left + wrap.clientWidth / 2; cy = r.top + wrap.clientHeight / 2; }
   const ox = cx - r.left, oy = cy - r.top;
-  const docX = (wrap.scrollLeft + ox) / S.zoom, docY = (wrap.scrollTop + oy) / S.zoom;
-  S.zoom = Math.min(4, Math.max(0.25, Math.round(z * 100) / 100));
+  const nextZoom = Math.min(4, Math.max(0.01, z));
+  S.view = zoomView(S.view, S.zoom, nextZoom, {x:ox,y:oy});
+  S.zoom = nextZoom;
   try { localStorage.setItem("diagram_zoom", S.zoom); } catch (e) {}
   render();
-  wrap.scrollLeft = docX * S.zoom - ox; wrap.scrollTop = docY * S.zoom - oy;
+
 }
-const STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 2.5, 3, 4];
-const zoomStep = dir => setZoom(dir > 0 ? (STEPS.find(v => v > S.zoom + 1e-6) ?? 4) : ([...STEPS].reverse().find(v => v < S.zoom - 1e-6) ?? 0.25));
+const STEPS = [0.01, 0.025, 0.05, 0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 2.5, 3, 4];
+const zoomStep = dir => setZoom(dir > 0 ? (STEPS.find(v => v > S.zoom + 1e-6) ?? 4) : ([...STEPS].reverse().find(v => v < S.zoom - 1e-6) ?? 0.01));
 function zoomFit(maxZoom = 4) {
+  closeEditor(true);
   const pts = [];
   for (const p of buildPrims()) {
     if (p.k === "ellipse") pts.push({ x: p.cx - p.rx, y: p.cy - p.ry }, { x: p.cx + p.rx, y: p.cy + p.ry });
@@ -2575,24 +2570,50 @@ function zoomFit(maxZoom = 4) {
   }
   const u = S.doc.underlay;
   if (u && u.src && u.visible !== false) pts.push({ x: u.x, y: u.y }, { x: u.x + u.w, y: u.y + u.h });
-  if (!pts.length) { setZoom(1); wrap.scrollLeft = wrap.scrollTop = 0; return; }
+  if (!pts.length) { setZoom(1); centerNewView(); return; }
   const x0 = Math.min(...pts.map(p => p.x)) - 30, x1 = Math.max(...pts.map(p => p.x)) + 30;
   const y0 = Math.min(...pts.map(p => p.y)) - 30, y1 = Math.max(...pts.map(p => p.y)) + 30;
-  S.zoom = Math.min(maxZoom, Math.max(0.25, Math.floor(Math.min(wrap.clientWidth / (x1 - x0), wrap.clientHeight / (y1 - y0)) * 100) / 100));
+  const fitted = fitView({x:x0,y:y0,w:x1-x0,h:y1-y0}, wrap.clientWidth, wrap.clientHeight, maxZoom);
+  S.zoom = fitted.zoom; S.view = fitted.view;
   try { localStorage.setItem("diagram_zoom", S.zoom); } catch (e) {}
   render();
-  wrap.scrollLeft = x0 * S.zoom; wrap.scrollTop = y0 * S.zoom;
+
 }
 $("z_in").onclick = () => zoomStep(1);
 $("z_out").onclick = () => zoomStep(-1);
 $("z_reset").onclick = () => setZoom(1);
 $("z_fit").onclick = () => zoomFit();
+$("b_locate").onclick = () => {
+  closeEditor(true);
+  const parts = shapes().filter(s => !["dot","circuit-junction"].includes(s.type));
+  const nameOf = s => (s.name || s.text || (s.type === "circuit" ? CIRCUIT_NAMES[s.kind] : s.type === "gate" ? GATE_NAMES[s.kind] : KIND_NAME[s.type]) || "パーツ").trim();
+  dialog("パーツへ移動", parts.length ? `<label class="locate-search">名前で検索<input type="search" id="locate_search" placeholder="部品名・文字・種類"></label><div class="locate-list">${parts.map(s => `<button type="button" class="locate-part" data-locate="${s.id}"><span><b>${esc(nameOf(s))}</b><small>${esc([s.type === "circuit" ? CIRCUIT_NAMES[s.kind] : s.type === "gate" ? GATE_NAMES[s.kind] : KIND_NAME[s.type],s.value].filter(Boolean).join(" · "))}</small></span><span class="locate-id">#${s.id} ↗</span></button>`).join("")}</div><p id="locate_empty" hidden>該当するパーツがありません。</p>` : "<p>まだパーツがありません。作図面に置くと、ここから移動できます。</p>");
+  const buttons = [...document.querySelectorAll("[data-locate]")];
+  buttons.forEach(b => b.onclick = () => {
+    const item = get(+b.dataset.locate); if (!item) return;
+    $("dlg").close(); setTool("select"); S.sel = [item.id];
+    const fitted = fitView({x:item.x-100,y:item.y-100,w:item.w+200,h:item.h+200},wrap.clientWidth,wrap.clientHeight,1);
+    S.view = fitted.view; S.zoom = fitted.zoom; render();
+    toast(`「${nameOf(item)}」へ移動しました`);
+  });
+  if ($("locate_search")) $("locate_search").oninput = e => {
+    const q = e.target.value.normalize("NFKC").toLowerCase().trim();
+    buttons.forEach(b => b.hidden = !b.textContent.normalize("NFKC").toLowerCase().includes(q));
+    $("locate_empty").hidden = buttons.some(b => !b.hidden);
+  };
+};
 // ⌘ + スクロール / ピンチ で拡大・縮小(サイト全体ではなく、この画面だけ)
 let resizeT = null;
 window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(render, 100); });
 wrap.addEventListener("wheel", ev => {
-  if (!(ev.ctrlKey || ev.metaKey)) return;
   ev.preventDefault();
+  if (!(ev.ctrlKey || ev.metaKey)) {
+    if (S.drag) return;
+    closeEditor(true);
+    const factor = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? wrap.clientHeight : 1;
+    S.view = panView(S.view, S.zoom, (ev.shiftKey && !ev.deltaX ? ev.deltaY : ev.deltaX)*factor, (ev.shiftKey && !ev.deltaX ? 0 : ev.deltaY)*factor);
+    S.mouse = ptOf(ev); render(); return;
+  }
   setCursor(ev.deltaY < 0 ? "zoom-in" : "zoom-out");
   setZoom(S.zoom * Math.exp(-ev.deltaY * 0.01), ev.clientX, ev.clientY);
 }, { passive: false });
@@ -2612,7 +2633,7 @@ $("f_image").onchange = async e => {
     setTool("select");
     const k=Math.min(1,600/im.w,500/im.h,wrap.clientWidth*0.7/S.zoom/im.w,wrap.clientHeight*0.7/S.zoom/im.h);
     const w=im.w*k,h=im.h*k;
-    const x=Math.max(0,(wrap.scrollLeft+wrap.clientWidth/2)/S.zoom-w/2), y=Math.max(0,(wrap.scrollTop+wrap.clientHeight/2)/S.zoom-h/2);
+    const x=S.view.x+wrap.clientWidth/2/S.zoom-w/2, y=S.view.y+wrap.clientHeight/2/S.zoom-h/2;
     pushHist();
     const item={id:S.doc.nextId++,type:"image",name:file.name,src:im.src,x,y,w,h};
     S.doc.items.push(item); S.sel=[item.id]; S.underEdit=false; commit();
@@ -2672,8 +2693,8 @@ function tidyLoaded() {
 
 // 新しい図では、実際に表示されるグリッドの中央を作業画面の中央に置く。
 function centerNewView() {
-  wrap.scrollLeft = Math.max(0, (S.vw * S.zoom - wrap.clientWidth) / 2);
-  wrap.scrollTop = Math.max(0, (S.vh * S.zoom - wrap.clientHeight) / 2);
+  S.view = {x:S.doc.W/2-wrap.clientWidth/2/S.zoom, y:S.doc.H/2-wrap.clientHeight/2/S.zoom};
+  render();
 }
 export function initEditor(opts = {}) {
   onChange = opts.onChange || onChange;
@@ -2695,8 +2716,8 @@ export function loadDoc(doc) {
   S.circuitLastGood = JSON.stringify(S.doc);
   lastPropsKey = "";
   render();
-  if (doc) wrap.scrollLeft = wrap.scrollTop = 0;
-  else centerNewView();
+  if (doc) zoomFit(1);
+  else { S.zoom = 1; centerNewView(); }
 }
 // 一時保存から戻すときや、別の図を取り込むとき:今の図と入れ替える(⌘Z で入れ替える前に戻れる)
 export function replaceDoc(doc) {
