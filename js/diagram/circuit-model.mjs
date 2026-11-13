@@ -2,6 +2,11 @@
 // 編集画面と取り込みで共通の端子・描画・接続検査を使う。
 export const CIRCUIT_TYPES = Object.freeze({
   switch: { pins: ['a', 'b'], width: 120, height: 80 },
+  opamp: { pins: ['inverting', 'noninverting', 'output'], width: 160, height: 160 },
+  optocoupler: { pins: ['anode', 'cathode', 'collector', 'emitter'], width: 200, height: 160 },
+  resistor_zigzag: { pins: ['a', 'b'], width: 120, height: 80 },
+  voltage_triangle: { pins: ['a', 'b'], width: 120, height: 80 },
+  battery: { pins: ['positive', 'negative'], width: 120, height: 80 },
   resistor: { pins: ['a', 'b'], width: 120, height: 80 },
   variable_resistor: { pins: ['a', 'b'], width: 120, height: 80 },
   capacitor: { pins: ['a', 'b'], width: 120, height: 80 },
@@ -16,6 +21,12 @@ export const CIRCUIT_TYPES = Object.freeze({
   ground: { pins: ['terminal'], width: 80, height: 80 },
 });
 
+export const CIRCUIT_PIN_NUMBERS = Object.freeze({
+  opamp: { inverting: '', noninverting: '', output: '' },
+  // SHARP PC817X の内部接続図と同じ端子順。番号は部品に合わせて変更できる。
+  optocoupler: { anode: '1', cathode: '2', collector: '4', emitter: '3' },
+});
+
 // 原点は記号の中心。回転しても端子名は変わらない。
 export function circuitPins(component) {
   const spec = CIRCUIT_TYPES[component.type];
@@ -24,7 +35,7 @@ export function circuitPins(component) {
   const rotation = component.rotation ?? 0;
   const rotate = ({ x, y }) => rotation === 0 ? { x, y } : rotation === 90 ? { x: -y, y: x } :
     rotation === 180 ? { x: -x, y: -y } : { x: y, y: -x };
-  const points = ['nmos', 'pmos'].includes(component.type) ? [{ x: -60, y: 0 }, { x: 20, y: component.type === 'nmos' ? -60 : 60 }, { x: 20, y: component.type === 'nmos' ? 60 : -60 }] : component.type === 'ground' ? [{ x: 0, y: -40 }] : [{ x: -60, y: 0 }, { x: 60, y: 0 }];
+  const points = component.type === 'opamp' ? [{x:-80,y:-40},{x:-80,y:40},{x:80,y:0}] : component.type === 'optocoupler' ? [{x:-100,y:-40},{x:-100,y:40},{x:100,y:-40},{x:100,y:40}] : ['nmos', 'pmos'].includes(component.type) ? [{ x: -60, y: 0 }, { x: 20, y: component.type === 'nmos' ? -60 : 60 }, { x: 20, y: component.type === 'nmos' ? 60 : -60 }] : component.type === 'ground' ? [{ x: 0, y: -40 }] : [{ x: -60, y: 0 }, { x: 60, y: 0 }];
   return Object.fromEntries(spec.pins.map((name, i) => {
     const p = rotate(points[i]);
     return [name, { x: component.x + p.x, y: component.y + p.y }];
@@ -98,7 +109,21 @@ export function circuitPrimitives(component) {
   const circle = (x, y, r) => { const [cx, cy] = xy(x, y); return { k: 'ellipse', cx, cy, rx: r, ry: r, lw, fill: '#ffffff' }; };
   const out = [];
   const mosfet = ['nmos', 'pmos'].includes(component.type);
-  if (mosfet) {
+  const textAt = (s, x, y, size = 12) => { const [tx, ty] = xy(x, y); return { k:'text', x:tx, y:ty, s, size, ha:'center', va:'center' }; };
+  if (component.type === 'opamp') {
+    out.push(path([[-40,-70],[60,0],[-40,70],[-40,-70]], '#ffffff'),
+      line(-80,-40,-40,-40), line(-80,40,-40,40), line(60,0,80,0),
+      line(-31,-40,-19,-40), line(-31,40,-19,40), line(-25,34,-25,46));
+    if (component.name) out.push(textAt(component.name, -5, 0, component.fontSize ?? 16));
+  } else if (component.type === 'optocoupler') {
+    // 左は発光ダイオード、右はNPNフォトトランジスタ。両側は電気的に独立。
+    out.push(path([[-64,-60],[64,-60],[64,60],[-64,60],[-64,-60]], '#ffffff'),
+      path([[-100,-40],[-40,-40],[-40,-14]]), path([[-40,12],[-40,40],[-100,40]]),
+      path([[-53,-14],[-27,-14],[-40,10],[-53,-14]], '#ffffff'), line(-53,12,-27,12),
+      line(26,-22,26,22), path([[26,-12],[50,-34],[50,-40],[100,-40]]),
+      path([[26,12],[50,34],[50,40],[100,40]]), path([[38,32],[50,34],[47,22]]));
+    for (const y of [-10,10]) out.push(line(-14,y,14,y), path([[6,y-5],[14,y],[6,y+5]]));
+  } else if (mosfet) {
     // 基板端子を省略したエンハンスメント型の簡略記号。Pチャネルだけゲートに白丸。
     // https://www.ele.kochi-tech.ac.jp/tacibana/etc/analog-intro/mosfet.html 図1(b)・図2(b)
     out.push(line(-20, -26, -20, 26), line(-8, -26, -8, 26),
@@ -119,6 +144,7 @@ export function circuitPrimitives(component) {
       // 抵抗本体を斜めに横切る矢印。端子は a・b の 2 つだけ。
       out.push(path([[-32, 27], [28, -27]]), path([[17, -24], [28, -27], [24, -16]]));
     }
+    if (component.type === 'resistor_zigzag') out.push(path([[-30,0],[-25,-14],[-15,14],[-5,-14],[5,14],[15,-14],[25,14],[30,0]]));
     if (component.type === 'switch') {
       out.push(line(-30, 0, -24, 0), line(24, 0, 30, 0),
         line(-24, 0, component.closed ? 24 : 20, component.closed ? 0 : -24),
@@ -144,6 +170,12 @@ export function circuitPrimitives(component) {
     if (component.type === 'voltage') {
       out.push(circle(0, 0, 30), line(-19, 0, -9, 0), line(-14, -5, -14, 5), line(9, 0, 19, 0));
     }
+    if (component.type === 'battery') {
+      out.push(line(-30,0,-18,0), line(18,0,30,0));
+      for (const x of [-18,6]) out.push(line(x,-22,x,22),line(x+12,-12,x+12,12));
+      out.push(line(-30,-30,-20,-30),line(-25,-35,-25,-25));
+    }
+    if (component.type === 'voltage_triangle') out.push(circle(0,0,30),path([[-18,8],[-6,-10],[6,10],[18,-8]]));
     if (component.type === 'voltage_dc') {
       // 長い線が正極、短い線が負極。端子 ID は回転後も変わらない。
       out.push(line(-30, 0, -8, 0), line(8, 0, 30, 0), line(-8, -22, -8, 22), line(8, -12, 8, 12));
@@ -162,8 +194,15 @@ export function circuitPrimitives(component) {
   } else {
     out.push(line(0, -40, 0, 0), line(-24, 0, 24, 0), line(-16, 7, 16, 7), line(-8, 14, 8, 14));
   }
-  const label = [component.name, component.value].filter(v => typeof v === 'string' && v.trim()).join('  ');
-  if (label && mosfet) out.push({ k: 'text', x: component.x + (rotation % 180 ? 0 : 72), y: component.y + (rotation % 180 ? 72 : 0), s: label, size: component.fontSize ?? 16, ha: rotation % 180 ? 'center' : 'left', va: 'center' });
+  if (component.pinLabels !== false && CIRCUIT_PIN_NUMBERS[component.type]) {
+    const numbers = {...CIRCUIT_PIN_NUMBERS[component.type], ...component.pinNumbers};
+    const positions = component.type === 'opamp' ? {inverting:[-62,-52],noninverting:[-62,52],output:[72,-14]}
+      : {anode:[-84,-52],cathode:[-84,52],collector:[84,-52],emitter:[84,52]};
+    for (const [pin, point] of Object.entries(positions)) if (numbers[pin]) out.push(textAt(String(numbers[pin]), ...point));
+  }
+  const label = [component.type === 'opamp' ? '' : component.name, component.value].filter(v => typeof v === 'string' && v.trim()).join('  ');
+  if (label && ['opamp', 'optocoupler'].includes(component.type)) out.push({k:'text',x:component.x,y:component.y + (component.type === 'optocoupler' ? -96 : 96),s:label,size:component.fontSize ?? 16,ha:'center',va:'center'});
+  else if (label && mosfet) out.push({ k: 'text', x: component.x + (rotation % 180 ? 0 : 72), y: component.y + (rotation % 180 ? 72 : 0), s: label, size: component.fontSize ?? 16, ha: rotation % 180 ? 'center' : 'left', va: 'center' });
   else if (label) out.push({ k: 'text', x: component.x + (rotation % 180 ? 48 : 0), y: component.y + (rotation % 180 ? 0 : 48), s: label, size: component.fontSize ?? 16, ha: rotation % 180 ? 'left' : 'center', va: 'center' });
   return out;
 }

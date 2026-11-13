@@ -239,3 +239,38 @@ svg#svg { display: block; user-select: none; }
 .tool-category select { min-width: 0; flex: 1; padding: 4px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 14px; }
 .tool-category select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 700px) { .tool-category { margin: 0 4px; flex-wrap: wrap; } .tool-category select { width: 100%; } }
+
+/* 分類・検索・よく使う操作は固定し、部品一覧だけをスクロールする。 */
+.tool-panel { width: 224px; display: flex; flex-direction: column; overflow: hidden; }
+.tool-panel .panel-heading { padding: var(--space-3); }
+.palette-categories { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); padding: 0 var(--space-2) var(--space-2); }
+.palette-categories button { min-height: 36px; font: inherit; font-size: var(--text-ui); border: 1px solid transparent; border-radius: var(--radius); background: transparent; color: var(--muted); cursor: pointer; }
+.palette-categories button[aria-pressed="true"] { background: var(--surface); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.palette-quick { display: flex; gap: var(--space-1); padding: var(--space-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.palette-quick .tool { flex: 1; margin: 0; min-height: 40px; flex-direction: row; justify-content: center; font-size: var(--text-ui); padding: var(--space-1); }
+.palette-quick .tool svg { width: 22px; height: 22px; }
+.palette-search { display: flex; margin: var(--space-2); gap: var(--space-1); }
+.palette-search input { min-width: 0; width: 100%; font: inherit; font-size: var(--text-ui); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-2); background: var(--surface); color: var(--ink); }
+.palette-search button { border: 0; background: transparent; color: var(--muted); min-width: 28px; font-size: 20px; cursor: pointer; }
+#palette { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; gap: var(--space-1); padding: 0 var(--space-2) var(--space-3); min-height: 0; overflow-y: auto; }
+#palette .circuit-library { grid-column: 1 / -1; }
+#palette .tool, #palette > .tool:first-child { grid-column: auto; min-height: 66px; display: flex; flex-direction: column; justify-content: center; text-align: center; gap: var(--space-1); padding: var(--space-1); font-size: var(--text-small); line-height: 1.3; }
+#palette .tool svg, #palette .gates .tool svg { width: 40px; height: 28px; }
+#palette .tool.on { border-color: var(--accent); }
+.palette-section { margin-bottom: var(--space-2); }
+.palette-section summary { cursor: pointer; padding: var(--space-2) var(--space-1); font-size: var(--text-small); font-weight: 600; color: var(--muted); }
+.palette-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-1); }
+.tool-panel [hidden], #palette .tool[hidden] { display: none !important; }
+.palette-no-results { padding: var(--space-2) var(--space-3); font-size: var(--text-small); color: var(--muted); }
+.tool-panel button:focus-visible, .palette-section summary:focus-visible, #tool_search:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 1100px) { .tool-panel { width: 192px; } }
+@media (max-width: 700px) {
+  .tool-panel { width: 112px; }
+  .tool-panel .panel-heading { padding: var(--space-2); }
+  .palette-categories { grid-template-columns: 1fr; gap: 0; }
+  .palette-categories button { min-height: 32px; font-size: var(--text-small); }
+  .palette-quick { flex-direction: column; }
+  #palette, .palette-grid, #palette .gates { grid-template-columns: 1fr; }
+  #palette .tool { min-height: 52px; }
+  .palette-search input { padding: var(--space-1); font-size: var(--text-small); }
+}

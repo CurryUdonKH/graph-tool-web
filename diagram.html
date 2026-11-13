@@ -78,7 +78,15 @@
     </div>
   </div>
   <div id="main">
-    <aside class="tool-panel" aria-label="作図の道具"><div class="panel-heading"><b>道具</b><span>選んで図に置く</span></div><div class="tool-category"><label for="tool_category">部品：</label><select id="tool_category" aria-label="部品の種類"><option value="shape">図形</option><option value="line">線</option><option value="gate">ゲート</option><option value="circuit">回路</option></select></div><div id="palette"></div></aside>
+    <aside class="tool-panel" aria-label="作図の道具">
+      <div class="panel-heading"><b>道具</b></div>
+      <nav id="tool_categories" class="palette-categories" aria-label="部品の種類">
+        <button type="button" data-category="shape" aria-pressed="true">図形</button><button type="button" data-category="line" aria-pressed="false">線</button><button type="button" data-category="gate" aria-pressed="false">論理ゲート</button><button type="button" data-category="circuit" aria-pressed="false">電気回路</button>
+      </nav>
+      <div id="tool_quick" class="palette-quick" aria-label="よく使う操作"></div>
+      <div class="palette-search"><input type="search" id="tool_search" aria-label="部品を検索" placeholder="部品を検索"><button type="button" id="tool_search_clear" aria-label="検索をクリア" hidden>×</button></div>
+      <div id="palette"></div><p id="tool_no_results" class="palette-no-results" role="status" hidden>見つかりません。別の名前で検索してください。</p>
+    </aside>
     <div class="canvas-panel"><div class="canvas-heading"><b>作図スペース</b><span class="canvas-instruction">図形を置いて、線でつなぎます</span><button class="ib sketch-entry" id="b_sketch" title="普段の AI で手書き画像を JSON に変換し、確認して取り込みます"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4zM16 4v4h4M8 15l3-3 2 2 3-3"/></svg><span><b>AIで手書き図を清書</b><small>いつもの AI で変換 → 結果を貼り付け</small></span></button></div><div id="wrap"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg><textarea id="edit" rows="1"></textarea></div></div>
     <aside class="properties-panel" aria-label="選択したものの設定"><div class="panel-heading"><b>設定</b><span>選択したものを調整</span></div><div id="side"></div></aside>
   </div>

@@ -8,7 +8,7 @@ import { snapToGuides } from "./snap.mjs";
 import { isWire, migrateWireTypes } from "./wiretypes.mjs";
 import { remapStyles } from "./textstyles.mjs";
 import { hasTerminal, terminalMode, splitTerminalMode, terminalPrimitives } from "./terminal-marks.mjs";
-import { circuitPins, circuitPrimitives, circuitRouteConflict, circuitPathCrossesBody, circuitRouteCandidates, splitCircuitPoints, CIRCUIT_TYPES } from "./circuit-model.mjs";
+import { circuitPins, circuitPrimitives, circuitRouteConflict, circuitPathCrossesBody, circuitRouteCandidates, splitCircuitPoints, CIRCUIT_TYPES, CIRCUIT_PIN_NUMBERS } from "./circuit-model.mjs";
 import { circuitDoubleClick } from "./circuit-interaction.mjs";
 // 図の作成エディタ(ブラウザ版)
 // 楕円・四角・注釈・文字と、直線/曲線/直角の矢印、論理ゲート・配線・接続点をマウスで置く。
@@ -443,7 +443,7 @@ const headPrim = (e, tip, from) => ({ k: "path", cmds: headCmds(tip, from, e.lw,
 // ------------------------------------------------------------------ 論理ゲートの形
 // 右向き。入力は左の辺(2 入力なら高さの 1/4 と 3/4、1 入力なら真ん中)、出力は右の辺の真ん中。
 const circuitCenter = s => ctr(s);
-const CIRCUIT_NAMES = { switch: "スイッチ", nmos: "MOSFET（Nチャネル）", pmos: "MOSFET（Pチャネル）", resistor: "抵抗", variable_resistor: "可変抵抗（2端子）", capacitor: "コンデンサ", inductor: "コイル", diode: "ダイオード", current_source: "電流源", voltage_dc: "直流電源", voltage_ac: "交流電源", ground: "接地", voltage: "従来の電圧源" };
+const CIRCUIT_NAMES = { opamp: "オペアンプ／コンパレータ", optocoupler: "フォトカプラ", resistor_zigzag: "抵抗（ギザギザ）", voltage_triangle: "三角波源", battery: "電池", switch: "スイッチ", nmos: "MOSFET（Nチャネル）", pmos: "MOSFET（Pチャネル）", resistor: "抵抗", variable_resistor: "可変抵抗（2端子）", capacitor: "コンデンサ", inductor: "コイル", diode: "ダイオード", current_source: "電流源", voltage_dc: "直流電源", voltage_ac: "交流電源", ground: "接地", voltage: "従来の電圧源" };
 const GATE_NAMES = { and: "AND", or: "OR", not: "NOT", nand: "NAND", nor: "NOR", xor: "XOR", xnor: "XNOR", buf: "バッファ", dff: "D-FF" };
 // D フリップフロップの端子(図形の左上からの割合):左 d・clock、右 q、上 set、下 reset
 // 高さを 3 等分した所に d・q と clock を置く(標準 80×120 = グリッド 4×6 マスで、端子がすべてグリッドに乗る)
@@ -2100,9 +2100,31 @@ function gateIcon(kind) {   // 実際の形(gatePrims)を小さく描いたア�
   return svgIcon(body, "0 0 60 40");
 }
 const TOOL_LABEL = { point: "黒点", circuit: "回路部品", "circuit-junction": "接続点", "circuit-wire": "回路配線", select: "選択", ellipse: "楕円", rect: "四角", trap: "台形", poly: "多角形", note: "注釈", text: "文字", straight: "直線", curve: "曲線", elbow: "直角線", dot: "接続点", wire: "配線" };
+let toolCategory = "shape";
+function filterPalette() {
+  const query = $("tool_search").value.normalize("NFKC").toLowerCase().trim();
+  let count = 0;
+  $("palette").querySelectorAll(".tool").forEach(b => {
+    const owner = b.closest("[data-group]"), category = owner?.dataset.group;
+    const match = !query || (b.dataset.search || b.textContent).normalize("NFKC").toLowerCase().includes(query);
+    b.hidden = category !== toolCategory || !match;
+    if (category === toolCategory && match) count++;
+  });
+  $("palette").querySelectorAll(".palette-section").forEach(group => {
+    group.hidden = ![...group.querySelectorAll(".tool")].some(b => !b.hidden);
+    if (query) group.open = true;
+  });
+  $("tool_no_results").hidden = count > 0;
+  $("tool_search_clear").hidden = !query;
+}
 function setToolCategory(category) {
+  if (toolCategory !== category) $("tool_search").value = "";
+  toolCategory = category;
   document.querySelectorAll("#palette [data-group]").forEach(el => { el.hidden = el.dataset.group !== category; });
-  $("tool_category").value = category;
+  document.querySelectorAll("#tool_quick [data-quick-group]").forEach(el => { el.hidden = el.dataset.quickGroup !== category; });
+  document.querySelectorAll("[data-category]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.category === category)));
+  filterPalette();
+  try { localStorage.setItem("diagram_tool_category", category); } catch {}
 }
 function buildToolbar() {
   const pal = $("palette");
@@ -2115,27 +2137,48 @@ function buildToolbar() {
     b.onclick = () => { if (extra) S.gateKind = extra; setTool(tool); };
     return b;
   };
-  pal.appendChild(btn("select", "選択", svgIcon(ICON.select)));
+  $("tool_quick").appendChild(btn("select", "選択", svgIcon(ICON.select)));
+  const gateWire = btn("wire", "配線", svgIcon(ICON.wire)); gateWire.dataset.quickGroup = "gate"; $("tool_quick").appendChild(gateWire);
   for (const t of ["ellipse", "rect", "trap", "poly", "note", "text", "point"]) { const b = btn(t, TOOL_LABEL[t], svgIcon(ICON[t])); b.dataset.group = "shape"; pal.appendChild(b); }
   // 接続点(●)は、配線の途中から分岐すると自動でできるので、道具の欄には出さない
   for (const t of ["wire", "straight", "curve", "elbow"]) { const b = btn(t, TOOL_LABEL[t], svgIcon(ICON[t])); b.dataset.group = "line"; pal.appendChild(b); }
   const g = document.createElement("div"); g.className = "gates"; g.dataset.group = "gate"; pal.appendChild(g);
   for (const k of Object.keys(GATE_NAMES)) g.appendChild(btn("gate", k === "buf" ? "BUF" : GATE_NAMES[k], gateIcon(k), k));
-  const cg = document.createElement("div"); cg.className = "gates"; cg.dataset.group = "circuit"; pal.appendChild(cg);
-  for (const [kind, label] of Object.entries(CIRCUIT_NAMES)) {
+  const cg = document.createElement("div"); cg.className = "circuit-library"; cg.dataset.group = "circuit"; pal.appendChild(cg);
+  const circuitGroups = [
+    ["基本部品", ["resistor", "resistor_zigzag", "variable_resistor", "capacitor", "inductor", "switch"]],
+    ["半導体・増幅", ["opamp", "optocoupler", "diode", "nmos", "pmos"]],
+    ["電源・信号", ["battery", "voltage_dc", "voltage_ac", "voltage_triangle", "current_source"]],
+    ["接地・接続", ["ground"]],
+  ];
+  const sectionFor = new Map();
+  for (const [title, kinds] of circuitGroups) {
+    const section = document.createElement("details"); section.className = "palette-section"; section.open = true;
+    const summary = document.createElement("summary"); summary.textContent = title; section.appendChild(summary);
+    const grid = document.createElement("div"); grid.className = "palette-grid"; section.appendChild(grid); cg.appendChild(section);
+    for (const kind of kinds) sectionFor.set(kind, grid);
+  }
+  for (const kind of circuitGroups.flatMap(([, kinds]) => kinds)) {
+    const label = CIRCUIT_NAMES[kind];
     if (kind === "voltage") continue; // 既存図では残すが、新しい部品としては選ばせない
     const spec = CIRCUIT_TYPES[kind];
     const prims = circuitPrimitives({ type: kind, x: spec.width / 2, y: spec.height / 2, rotation: 0, pinLabels: false });
-    const body = prims.map(p => p.k === "ellipse" ? `<ellipse cx="${p.cx}" cy="${p.cy}" rx="${p.rx}" ry="${p.ry}" fill="none" stroke="currentColor" stroke-width="5"/>` : `<path d="${dStr(p.cmds)}" fill="none" stroke="currentColor" stroke-width="5"/>`).join("");
+    const body = prims.filter(p => p.k !== "text").map(p => p.k === "ellipse" ? `<ellipse cx="${p.cx}" cy="${p.cy}" rx="${p.rx}" ry="${p.ry}" fill="none" stroke="currentColor" stroke-width="5"/>` : `<path d="${dStr(p.cmds)}" fill="none" stroke="currentColor" stroke-width="5"/>`).join("");
     const b = btn("circuit", label, svgIcon(body, `0 0 ${spec.width} ${spec.height}`)); b.dataset.circuit = kind;
-    b.onclick = () => { S.circuitKind = kind; setTool("circuit"); }; cg.appendChild(b);
+    b.dataset.search = `${label} ${{opamp:"オペアンプ コンパレータ op amp comparator",optocoupler:"フォトカプラ photocoupler optocoupler PC817",resistor_zigzag:"抵抗 resistor",battery:"電池 バッテリー battery",voltage_triangle:"三角波 信号源 triangle",nmos:"nmos Nチャネル",pmos:"pmos Pチャネル"}[kind] || kind}`;
+    b.onclick = () => { S.circuitKind = kind; setTool("circuit"); }; sectionFor.get(kind).appendChild(b);
   }
-  cg.appendChild(btn("circuit-junction", "接続点", svgIcon(ICON.dot)));
+  sectionFor.get("ground").appendChild(btn("circuit-junction", "接続点", svgIcon(ICON.dot)));
   const cw = btn("circuit-wire", "回路配線", svgIcon(ICON.wire));
   cw.title = "端子・接続点・配線途中・空白から始め、折点をクリック。端子・配線途中をクリック、または空白をダブルクリックか Enter で終えます。Alt で吸着を解除します。";
-  cw.onclick = () => { S.circuitError = ""; circuitCompleted = null; lastDown = null; setTool("circuit-wire"); }; cg.appendChild(cw);
-  $("tool_category").onchange = e => { const category = e.target.value; setTool("select"); setToolCategory(category); };
-  setToolCategory("shape");
+  cw.onclick = () => { S.circuitError = ""; circuitCompleted = null; lastDown = null; setTool("circuit-wire"); }; cw.dataset.quickGroup = "circuit"; $("tool_quick").appendChild(cw);
+  document.querySelectorAll("[data-category]").forEach(b => b.onclick = () => { setTool("select"); setToolCategory(b.dataset.category); });
+  $("tool_search").oninput = filterPalette;
+  $("tool_search_clear").onclick = () => { $("tool_search").value = ""; filterPalette(); $("tool_search").focus(); };
+  $("tool_search").onkeydown = e => { if (e.key === "Escape") { e.stopPropagation(); $("tool_search_clear").click(); } };
+  let initialCategory = "shape";
+  try { const saved = localStorage.getItem("diagram_tool_category"); if (["shape","line","gate","circuit"].includes(saved)) initialCategory = saved; } catch {}
+  setToolCategory(initialCategory);
 
   $("g_show").onchange = e => { S.doc.showGrid = e.target.checked; commit(); };
   $("g_snap").onchange = e => { S.doc.snap = e.target.checked; commit(); };
@@ -2228,7 +2271,7 @@ function sideHTML(items) {
     例:<code>$\\alpha$</code>、<code>$x_1$</code>、<code>$10^{-3}$</code><br>
     くわしくは右上の「？ → 数式の書き方」</details></div>`;
   const one = items[0], shapesSel = items.filter(isShape), edgesSel = items.filter(i => !isShape(i));
-  if (items.length === 1 && one.type === "circuit") return `<div class="sec"><h4>${CIRCUIT_NAMES[one.kind]}</h4>${one.kind === "switch" ? "<p>2端子のスイッチです。開く・閉じるを切り替えても配線は保たれます。</p>" : ["nmos", "pmos"].includes(one.kind) ? "<p>G：ゲート、D：ドレイン、S：ソース。基板端子を省略した簡略記号です。Pチャネルはゲートに白丸があります。</p>" : one.kind === "current_source" ? "<p>矢印は端子 a から b の向きです。回転で向きを変えられます。</p>" : one.kind === "variable_resistor" ? "<p>端子は2つです。矢印は値の調整を表します。</p>" : one.kind === "diode" ? "<p>三角形側がアノード、縦線側がカソードです。</p>" : one.kind === "voltage_dc" ? "<p>長い線が正極、短い線が負極です。</p>" : one.kind === "voltage_ac" ? "<p>交流の端子に固定した正極・負極はありません。</p>" : one.kind === "voltage" ? "<p>従来の記号と接続をそのまま保持しています。</p>" : ""}<label>部品名 <input id="c_name" maxlength="100"></label><label>値 <input id="c_value" maxlength="100"></label></div><div class="sec"><button class="btn wide" id="c_rotate">90度回転</button>${one.kind === "switch" ? seg("switchstate", [["open", "開く"], ["closed", "閉じる"]], one.closed ? "closed" : "open") : ""}${["nmos", "pmos"].includes(one.kind) ? '<label><input type="checkbox" id="c_pin_labels"> 端子名（G・D・S）を表示</label>' : ""}${one.kind === "capacitor" ? '<label><input type="checkbox" id="c_polarized"> 極性あり</label>' : ""}</div><div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
+  if (items.length === 1 && one.type === "circuit") return `<div class="sec"><h4>${CIRCUIT_NAMES[one.kind]}</h4>${one.kind === "opamp" ? "<p>上が反転入力（−）、下が非反転入力（＋）です。電源端子を省略した記号です。</p>" : one.kind === "optocoupler" ? "<p>左がLED、右がフォトトランジスタの4端子記号です。</p>" : one.kind === "switch" ? "<p>2端子のスイッチです。開く・閉じるを切り替えても配線は保たれます。</p>" : ["nmos", "pmos"].includes(one.kind) ? "<p>G：ゲート、D：ドレイン、S：ソース。基板端子を省略した簡略記号です。Pチャネルはゲートに白丸があります。</p>" : one.kind === "current_source" ? "<p>矢印は端子 a から b の向きです。回転で向きを変えられます。</p>" : one.kind === "variable_resistor" ? "<p>端子は2つです。矢印は値の調整を表します。</p>" : one.kind === "diode" ? "<p>三角形側がアノード、縦線側がカソードです。</p>" : one.kind === "voltage_dc" ? "<p>長い線が正極、短い線が負極です。</p>" : one.kind === "voltage_ac" ? "<p>交流の端子に固定した正極・負極はありません。</p>" : one.kind === "voltage" ? "<p>従来の記号と接続をそのまま保持しています。</p>" : ""}<label>部品名 <input id="c_name" maxlength="100"></label><label>値 <input id="c_value" maxlength="100"></label></div><div class="sec"><button class="btn wide" id="c_rotate">90度回転</button>${one.kind === "switch" ? seg("switchstate", [["open", "開く"], ["closed", "閉じる"]], one.closed ? "closed" : "open") : ""}${["nmos", "pmos"].includes(one.kind) ? '<label><input type="checkbox" id="c_pin_labels"> 端子名（G・D・S）を表示</label>' : ""}${CIRCUIT_PIN_NUMBERS[one.kind] ? `<label><input type="checkbox" id="c_pin_labels"> 端子番号を表示</label>${Object.keys(CIRCUIT_PIN_NUMBERS[one.kind]).map(pin => `<label>${({inverting:"反転入力（−）",noninverting:"非反転入力（＋）",output:"出力",anode:"アノード",cathode:"カソード",collector:"コレクタ",emitter:"エミッタ"})[pin]}の番号<input data-c-pin="${pin}" maxlength="8" value="${esc(one.pinNumbers?.[pin] ?? CIRCUIT_PIN_NUMBERS[one.kind][pin])}" placeholder="番号なし"></label>`).join("")}` : ""}${one.kind === "capacitor" ? '<label><input type="checkbox" id="c_polarized"> 極性あり</label>' : ""}</div><div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   if (items.length === 1 && (one.circuitWire || one.type === "circuit-junction")) return `<div class="sec"><h4>${one.circuitWire ? "回路配線" : "回路の接続点"}</h4></div>${one.circuitWire ? "<p>線を選び、両端の丸をドラッグすると長さや接続先を変えられます。</p>" + terminalSection(one) : ""}<div class="sec"><button class="btn wide danger" id="p_delete">削除</button></div>`;
   if (items.every(i => i.type === "image")) return `<div class="sec"><h4>${items.length === 1 ? "配置した画像" : `${items.length}枚の画像`}</h4>
     ${items.length === 1 ? `<p>${esc(one.name || "画像")}</p><label>幅（pt）<input id="image_width" type="number" min="20" max="10000" step="1" value="${Math.round(one.w * 100) / 100}"></label><p>縦横比を保って拡大・縮小します。角をドラッグしても変更できます。</p>` : ""}
@@ -2357,6 +2400,7 @@ function bindSide() {
   if ($("c_name")) { $("c_name").value = items[0].name || ""; $("c_name").onchange = e => set(i => i.name = e.target.value); }
   if ($("c_value")) { $("c_value").value = items[0].value || ""; $("c_value").onchange = e => set(i => i.value = e.target.value); }
   if ($("c_pin_labels")) { $("c_pin_labels").checked = items[0].pinLabels !== false; $("c_pin_labels").onchange = e => { const checked = e.target.checked; set(i => i.pinLabels = checked); }; }
+  document.querySelectorAll("[data-c-pin]").forEach(n => n.onchange = e => { const pin = e.target.dataset.cPin, value = e.target.value; set(i => { i.pinNumbers = {...i.pinNumbers, [pin]:value}; }); });
   if ($("c_polarized")) { $("c_polarized").checked = !!items[0].polarized; $("c_polarized").onchange = e => set(i => i.polarized = e.target.checked); }
   if ($("c_rotate")) $("c_rotate").onclick = () => set(i => {
     const c = ctr(i); i.rotation = ((i.rotation || 0) + 90) % 360;
@@ -2454,8 +2498,10 @@ function bindSide() {
 const one = items => items[0] || {};
 let lastPropsKey = "";
 function updateUI() {
-  document.querySelectorAll("#palette .tool").forEach(b => b.classList.toggle("on",
-    b.dataset.tool === S.tool && (S.tool !== "gate" || b.dataset.gate === S.gateKind) && (S.tool !== "circuit" || b.dataset.circuit === S.circuitKind)));
+  document.querySelectorAll(".tool-panel .tool").forEach(b => {
+    const active = b.dataset.tool === S.tool && (S.tool !== "gate" || b.dataset.gate === S.gateKind) && (S.tool !== "circuit" || b.dataset.circuit === S.circuitKind);
+    b.classList.toggle("on", active); b.setAttribute("aria-pressed", String(active));
+  });
   $("g_show").checked = S.doc.showGrid; $("g_snap").checked = S.doc.snap; $("g_edge_snap").checked = S.doc.snapEdge; $("g_size").value = String(S.doc.grid);
   $("b_undo").disabled = !S.hist.length; $("b_redo").disabled = !S.fut.length;
   $("b_dup").disabled = $("b_del").disabled = !S.sel.length;
